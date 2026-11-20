@@ -52,6 +52,7 @@ function readList(key) {
 const favorites = new Set(readList('jinkra.favorites'));
 let recents = readList('jinkra.recents');
 const root = document.getElementById('app');
+const boot = root.querySelector('.initial-boot');
 const content = el('main', { id: 'main-content', class: 'content' });
 const navigation = el('nav', { class: 'navigation', 'aria-label': '工具导航' });
 const search = input({ type: 'search', placeholder: '搜索工具、操作或格式', 'aria-label': '搜索工具', autocomplete: 'off', spellcheck: 'false' });
@@ -368,6 +369,8 @@ workspace.append(el('aside', { class: 'sidebar' }, navigation, el('footer', { cl
   el('div', { class: 'version-line' }, versionLabel, el('span', { class: 'activated-label' }, '已激活')), copyright)), content);
 workspace.hidden = true;
 frame.append(windowBar, workspace, dialog, settingsDialog, modeToast);
+boot.classList.remove('initial-boot');
+frame.append(boot);
 root.append(frame);
 
 const updateDialog = el('dialog', { class: 'about update-dialog' });
@@ -427,7 +430,7 @@ function openUpdate(known, message = '') {
   if (message) status.set(message, 'error');
   else if (known && state.update) draw(state.update);
   else {
-    status.set('正在查询 GitHub…');
+    status.set('正在查询最新版本...');
     void desktop.checkUpdate().then((update) => {
       showUpdateResult(update);
       if (status.node.isConnected) { status.set(''); draw(update); }
@@ -480,16 +483,8 @@ function lock() {
 }
 
 async function start() {
-  const boot = el('div', { class: 'gateway' }, el('section', { class: 'boot-content', role: 'status' },
-    el('div', { class: 'boot-mark' }, el('img', { class: 'launch-logo boot-logo', src: logo, alt: '' }),
-      el('div', {}, el('h1', {}, 'Jinkra 工具箱'), el('p', {}, '正在启动…'))),
-    el('div', { class: 'boot-progress' })));
-  frame.append(boot);
   try {
-    const [activation] = await Promise.all([
-      globalThis.desktop ? desktop.activationState() : { active: true },
-      new Promise((resolve) => setTimeout(resolve, preferences.motion ? 820 : 100)),
-    ]);
+    const activation = globalThis.desktop ? await desktop.activationState() : { active: true };
     if (activation.active) enter();
     else lock();
   } catch {

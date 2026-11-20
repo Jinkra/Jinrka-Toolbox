@@ -15,12 +15,16 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: {
 } }]);
 
 const selections = new Map();
+const inputKinds = new Set(['image', 'gif', 'pdf']);
 const fileFilters = {
   any: [],
   directory: [],
   zip: [{ name: 'ZIP 归档', extensions: ['zip'] }],
   video: [{ name: '视频', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v', 'flv', 'wmv', 'ogv', 'mpg', 'mpeg', 'ts', 'm2ts', '3gp'] }],
   audio: [{ name: '音频', extensions: ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'wma', 'mp4', 'webm'] }],
+  image: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif', 'bmp', 'svg', 'ico', 'heic', 'heif', 'tif', 'tiff'] }],
+  gif: [{ name: 'GIF 动图', extensions: ['gif'] }],
+  pdf: [{ name: 'PDF 文档', extensions: ['pdf'] }],
 };
 const hotkey = 'CommandOrControl+Alt+J';
 const icon = app.isPackaged
@@ -100,8 +104,11 @@ async function pickSave(title, defaultPath, extensions) {
   return result.filePath;
 }
 
-function setupIpc() {
-  ipc('activation:state', activationState, false);
+function setupIpc(activationReady) {
+  ipc('activation:state', async () => {
+    await activationReady;
+    return activationState();
+  }, false);
   ipc('activation:submit', activate, false);
   ipc('creator:open', () => shell.openExternal('https://jinkra.slatt.cn/'), false);
   ipc('update:check', checkUpdate);
@@ -199,19 +206,26 @@ if (!app.requestSingleInstanceLock()) {
     protocol.handle('app', async (request) => {
       const address = new URL(request.url);
       if (address.host !== 'jinkra' || request.method !== 'GET') return new Response(null, { status: 404 });
-      const relative = decodeURIComponent(address.pathname.slice(1)) || 'index.html';
-      const resolved = path.resolve(dist, relative);
-      if (!resolved.startsWith(dist + path.sep)) return new Response(null, { status: 404 });
       try {
-        return await net.fetch(pathToFileURL(resolved).href, { bypassCustomProtocolHandlers: true });
+        const relative = decodeURIComponent(address.pathname.slice(1)) || 'index.html';
+        const input = relative.match(/^selected\/([a-f0-9-]{36})\/(\d+)$/u);
+        let file;
+        if (input) {
+          const chosen = selections.get(input[1]);
+          if (activationState().active && inputKinds.has(chosen?.kind)) file = chosen.paths[Number(input[2])];
+          if (!file || !(await stat(file)).isFile()) return new Response(null, { status: 404 });
+        } else {
+          file = path.resolve(dist, relative);
+          if (!file.startsWith(dist + path.sep)) return new Response(null, { status: 404 });
+        }
+        return await net.fetch(pathToFileURL(file).href, { bypassCustomProtocolHandlers: true });
       } catch {
         return new Response(null, { status: 404 });
       }
     });
     Menu.setApplicationMenu(null);
     app.setAppUserModelId('com.jinkra.toolbox');
-    await loadActivation();
-    setupIpc();
+    setupIpc(loadActivation());
     await setupWindow();
     tray = new Tray(icon);
     tray.setToolTip('Jinkra 工具箱');

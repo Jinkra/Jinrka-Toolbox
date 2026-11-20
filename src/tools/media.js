@@ -132,7 +132,7 @@ async function processGif(file, operation, speed, stride = 1) {
 function imageTool() {
   const mode = select([['compress', '压缩 / 转格式'], ['crop', '裁剪 / 旋转'], ['color', '调色'],
     ['watermark', '文字水印'], ['stitch', '拼接'], ['exif', '查看 EXIF'], ['gif', 'GIF 处理']]);
-  const files = fileInput('image/*,.heic,.heif');
+  const files = fileInput('image');
   const type = select(imageFormats);
   const quality = input({ type: 'number', min: 1, max: 100, value: 82 });
   const maxSide = input({ type: 'number', min: 0, max: 16384, value: 0 });
@@ -178,8 +178,7 @@ function imageTool() {
 
   function refreshFields() {
     const active = mode.value;
-    files.accept = active === 'gif' ? '.gif,image/gif' : 'image/*,.heic,.heif';
-    files.multiple = active === 'stitch';
+    files.configure(active === 'gif' ? 'gif' : 'image', active === 'stitch');
     const common = active === 'gif' || active === 'exif' ? [] : [
       field('输出格式', type), type.value !== 'image/png' && simpleOnly(field('输出品质', profile)),
     ];
@@ -208,14 +207,17 @@ function imageTool() {
 
   type.value = 'image/webp';
   refreshFields();
-  mode.addEventListener('change', () => { files.value = ''; reset(); status.set(); refreshFields(); });
+  mode.addEventListener('change', () => {
+    files.clear();
+    refreshFields();
+  });
   type.addEventListener('change', refreshFields);
   gifOperation.addEventListener('change', refreshFields);
-  files.addEventListener('change', () => { reset(); status.set(); });
+  files.node.addEventListener('change', () => { reset(); status.set(); });
 
   const process = task(status, async () => {
     reset();
-    const picked = chosenFiles(files);
+    const picked = await chosenFiles(files);
     const [file] = picked;
     const base = file.name.replace(/\.[^.]+$/u, '');
     const active = mode.value;
@@ -300,13 +302,13 @@ function imageTool() {
     }
     save.hidden = false;
   });
-  return box(row(field('操作', mode), field('选择图片', files)), settings,
+  return box(row(field('操作', mode), field('选择图片', files.node)), settings,
     actions(button('处理图片', process, 'primary'), save), status.node, details, preview);
 }
 
 function qrTool() {
   const content = area('输入文本或链接…', 'Jinkra 工具箱');
-  const file = fileInput('image/*');
+  const file = fileInput('image');
   const status = makeStatus();
   const result = resultText();
   const preview = el('div', { class: 'qr-preview' });
@@ -334,7 +336,7 @@ function qrTool() {
   const decode = task(status, async () => {
     decoded = '';
     result.textContent = '';
-    const [chosen] = chosenFiles(file);
+    const [chosen] = await chosenFiles(file);
     const image = await createImageBitmap(chosen);
     try {
       const scale = Math.min(1, 2400 / Math.max(image.width, image.height));
@@ -354,7 +356,7 @@ function qrTool() {
   return box(proPanel(field('尺寸（像素）', dimension), field('留白（模块）', margin), field('纠错等级', errorLevel),
     field('前景颜色', dark), field('背景颜色', light)), el('div', { class: 'editor-grid' },
     el('div', { class: 'tool-column' }, field('二维码内容', content), actions(button('生成二维码', encode, 'primary'), exportButton), preview),
-    el('div', { class: 'tool-column' }, field('二维码图片', file), actions(button('识别二维码', decode, 'primary'),
+    el('div', { class: 'tool-column' }, field('二维码图片', file.node), actions(button('识别二维码', decode, 'primary'),
       copyButton(() => decoded, status)), result)), status.node);
 }
 

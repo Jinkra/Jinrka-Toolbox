@@ -122,12 +122,12 @@ function lineSort() {
 }
 
 function imageInfo() {
-  const files = fileInput('image/*');
+  const files = fileInput('image');
   const include = select([['summary', '尺寸与色彩'], ['meta', '同时读取 EXIF']]);
   const status = makeStatus();
   const result = resultText();
-  return box(field('选择图片', files), proPanel(field('报告内容', include)), actions(button('读取图片信息', task(status, async () => {
-    const [file] = chosenFiles(files);
+  return box(field('选择图片', files.node), proPanel(field('报告内容', include)), actions(button('读取图片信息', task(status, async () => {
+    const [file] = await chosenFiles(files);
     const bitmap = await createImageBitmap(file);
     try {
       const resultText = [file.name, `尺寸  ${bitmap.width} × ${bitmap.height}`, `体积  ${readableSize(file.size)}`, `类型  ${file.type || '未知'}`];
@@ -189,15 +189,15 @@ function fileInfo() {
 }
 
 function pdfOrganize() {
-  const files = fileInput('.pdf,application/pdf');
+  const files = fileInput('pdf');
   const pages = input({ placeholder: '例如 3,1-2（依此顺序输出）' });
   const rotate = select([['0', '保留原角度'], ['90', '顺时针 90°'], ['180', '180°'], ['270', '逆时针 90°']]);
   const [reverseLabel, reverse] = check('反转所选页面顺序');
   const status = makeStatus();
-  return box(row(field('选择 PDF', files), field('页面与顺序', pages, '留空保留所有页面。重复页码会重复输出。')),
+  return box(row(field('选择 PDF', files.node), field('页面与顺序', pages, '留空保留所有页面。重复页码会重复输出。')),
     proPanel(field('所有输出页额外旋转', rotate), reverseLabel),
     actions(button('导出整理后的 PDF', task(status, async () => {
-      const [file] = chosenFiles(files);
+      const [file] = await chosenFiles(files);
       const { organizePdf } = await import('./pdf.js');
       const blob = await organizePdf(file, pages.value, Number(proValue(rotate, '0')), isPro() && reverse.checked);
       await saveBlob(blob, '整理结果.pdf', status);
@@ -205,18 +205,18 @@ function pdfOrganize() {
 }
 
 function imagePdf() {
-  const files = fileInput('image/*', true);
+  const files = fileInput('image', true);
   const paper = select([['auto', '随图片尺寸'], ['a4', 'A4'], ['letter', 'Letter']]);
   const layout = select([['portrait', '纵向'], ['landscape', '横向']]);
   const margin = input({ type: 'number', min: 0, max: 90, value: 15 });
   const status = makeStatus();
-  return box(field('选择图片', files, '每张图生成一页，按文件选择顺序输出。'),
+  return box(field('选择图片', files.node, '每张图生成一页，按文件选择顺序输出。'),
     proPanel(field('纸张尺寸', paper), field('纸张方向', layout), field('留白（点）', margin)),
     actions(button('生成并保存 PDF', task(status, async () => {
       if (isPro() && (!margin.value || !margin.checkValidity())) throw new Error('留白须为 0–90 之间的整数。');
       const { PDFDocument } = await import('pdf-lib');
       const pdf = await PDFDocument.create();
-      for (const file of chosenFiles(files)) {
+      for (const file of await chosenFiles(files)) {
         const bitmap = await createImageBitmap(file);
         try {
           const canvas = canvasAt(bitmap.width, bitmap.height);

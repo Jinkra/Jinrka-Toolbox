@@ -1,5 +1,4 @@
 import { applyEdits, createScanner, format, SyntaxKind } from 'jsonc-parser';
-import { CronExpressionParser } from 'cron-parser';
 import { area, check, field, input, isPro, outputTool, proValue, select, transformTool } from '../ui.js';
 
 function json(source, mode, indent = '2', eol = '\n') {
@@ -200,7 +199,8 @@ export const developerTools = [
     const count = select(['8', '3', '15', '30', '50']);
     const baseline = input({ type: 'datetime-local' });
     return outputTool([field('表达式', expression, '支持五字段和含秒的六字段。')],
-      '查看触发时间', () => {
+      '查看触发时间', async () => {
+        const { CronExpressionParser } = await import('cron-parser');
         const tz = proValue(zone, Intl.DateTimeFormat().resolvedOptions().timeZone).trim();
         const parsed = CronExpressionParser.parse(expression.value.trim(), { tz, currentDate: proValue(baseline, '') || undefined });
         const formatTime = new Intl.DateTimeFormat('zh-CN', {

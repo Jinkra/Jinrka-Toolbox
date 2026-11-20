@@ -119,7 +119,7 @@ function renameTool() {
 }
 
 function pdfTool() {
-  const files = fileInput('.pdf,application/pdf', true);
+  const files = fileInput('pdf', true);
   const mode = select([['merge', '合并 PDF'], ['split', '拆分 PDF'], ['render', 'PDF 转图片']]);
   const pages = input({ placeholder: '例如 1-3,5，留空处理全部页' });
   const scale = select([['1', '1×（72 DPI）'], ['2', '2×（144 DPI）'], ['3', '3×（216 DPI）']]);
@@ -141,8 +141,8 @@ function pdfTool() {
     status.set();
   }
   function refresh() {
-    files.multiple = mode.value === 'merge';
-    files.value = '';
+    files.configure('pdf', mode.value === 'merge');
+    files.clear();
     scaleField.hidden = mode.value !== 'render';
     imageField.hidden = mode.value !== 'render';
     reverseLabel.hidden = mode.value !== 'merge';
@@ -152,15 +152,15 @@ function pdfTool() {
   }
   refresh();
   mode.addEventListener('change', refresh);
-  files.addEventListener('change', invalidate);
+  files.node.addEventListener('change', invalidate);
   pages.addEventListener('input', invalidate);
   scale.addEventListener('change', invalidate);
-  return box(row(field('操作', mode), field('选择 PDF', files), pagesField), advanced,
+  return box(row(field('操作', mode), field('选择 PDF', files.node), pagesField), advanced,
     note('合并按所选文件顺序进行。拆分时每个页码范围生成一个 PDF，结果打包为 ZIP。'),
     actions(button('处理 PDF', task(status, async () => {
       exportFile = null;
       save.hidden = true;
-      const picked = chosenFiles(files);
+      const picked = await chosenFiles(files);
       const [file] = picked;
       const pdf = await import('./pdf.js');
       if (mode.value === 'merge') {

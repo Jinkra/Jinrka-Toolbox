@@ -80,7 +80,38 @@ export const actions = (...children) => el('div', { class: 'actions' }, children
 export const note = (message) => el('p', { class: 'hint' }, message);
 export const box = (...children) => el('section', { class: 'surface' }, children);
 export const resultText = () => el('pre', { class: 'output', 'aria-live': 'polite' }, '处理结果会显示在这里。');
-export const fileInput = (accept, multiple = false) => input({ type: 'file', accept, multiple });
+const browserFileTypes = { image: 'image/*,.heic,.heif,.tif,.tiff', gif: '.gif,image/gif', pdf: '.pdf,application/pdf' };
+
+export function fileInput(kind, multiple = false) {
+  if (!globalThis.desktop) {
+    const node = input({ type: 'file', accept: browserFileTypes[kind], multiple });
+    return {
+      node,
+      clear: () => { node.value = ''; node.dispatchEvent(new Event('change')); },
+      configure: (nextKind, nextMultiple) => { node.accept = browserFileTypes[nextKind]; node.multiple = nextMultiple; },
+      readFiles: () => [...node.files],
+    };
+  }
+  const status = makeStatus();
+  const node = el('div', { class: 'file-input' });
+  const picker = nativeFiles(kind, multiple, status, () => node.dispatchEvent(new Event('change')));
+  node.append(picker.node, status.node);
+  return {
+    node,
+    clear: picker.clear,
+    configure: picker.configure,
+    async readFiles() {
+      const selection = picker.selection;
+      if (!selection) return [];
+      return Promise.all(selection.names.map(async (name, index) => {
+        const response = await fetch(`app://jinkra/selected/${selection.id}/${index}`);
+        if (!response.ok) throw new Error(`无法读取「${name}」，请重新选择该文件。`);
+        const blob = await response.blob();
+        return new File([blob], name, { type: blob.type });
+      }));
+    },
+  };
+}
 export const check = (label, checked = false) => {
   const control = input({ type: 'checkbox', checked });
   return [el('label', { class: 'check' }, control, label), control];
@@ -159,16 +190,16 @@ export async function saveBlob(blob, name, status) {
   status.set('已发起下载。', 'success');
 }
 
-export function chosenFiles(control) {
-  const files = [...control.files];
+export async function chosenFiles(control) {
+  const files = await control.readFiles();
   if (!files.length) throw new Error('请先选择文件。');
   return files;
 }
 
 export function nativeFiles(kind, multiple, status, onChange = () => {}) {
   let selection;
-  const empty = kind === 'directory' ? '尚未选择文件夹' : '尚未选择文件';
-  const names = el('p', { class: 'file-names' }, empty);
+  const empty = () => kind === 'directory' ? '尚未选择文件夹' : '尚未选择文件';
+  const names = el('p', { class: 'file-names' }, empty());
   const choose = button(kind === 'directory' ? '选择文件夹…' : '选择文件…', task(status, async () => {
     const result = await desktop.pickFiles(kind, multiple);
     if (result) {
@@ -180,13 +211,21 @@ export function nativeFiles(kind, multiple, status, onChange = () => {}) {
   }, '等待选择文件…'), 'secondary', 'Files');
   return {
     node: el('div', { class: 'file-picker' }, choose, names),
+    get selection() { return selection; },
     get id() {
       if (!selection) throw new Error('请先选择文件。');
       return selection.id;
     },
+    configure(nextKind, nextMultiple) {
+      if (nextKind === kind && nextMultiple === multiple) return;
+      kind = nextKind;
+      multiple = nextMultiple;
+      selection = null;
+      names.textContent = empty();
+    },
     clear() {
       selection = null;
-      names.textContent = empty;
+      names.textContent = empty();
       onChange();
     },
   };

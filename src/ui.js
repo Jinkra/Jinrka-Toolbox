@@ -2,7 +2,7 @@ import {
   AlignLeft, Archive, ArrowDownUp, ArrowLeft, ArrowRight, Binary, Braces, CaseSensitive,
   Check, ChevronRight, CircleHelp, Clipboard, CodeXml, Copy, FileCheck, FilePenLine,
   Files, FileText, Fingerprint, Grid2X2, Hash, Image, KeyRound, Link2, LockKeyhole,
-  NotebookPen, Palette, Pin, QrCode, Regex, Search, ShieldCheck, Shuffle, Star,
+  NotebookPen, Palette, Pin, QrCode, Regex, Search, Settings2, ShieldCheck, Shuffle, Star,
   Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3,
 } from 'lucide';
 
@@ -10,7 +10,7 @@ const icons = {
   AlignLeft, Archive, ArrowDownUp, ArrowLeft, ArrowRight, Binary, Braces, CaseSensitive,
   Check, ChevronRight, CircleHelp, Clipboard, CodeXml, Copy, FileCheck, FilePenLine,
   Files, FileText, Fingerprint, Grid2X2, Hash, Image, KeyRound, Link2, LockKeyhole,
-  NotebookPen, Palette, Pin, QrCode, Regex, Search, ShieldCheck, Shuffle, Star,
+  NotebookPen, Palette, Pin, QrCode, Regex, Search, Settings2, ShieldCheck, Shuffle, Star,
   Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3,
 };
 
@@ -122,7 +122,7 @@ export function task(status, work, label = '处理中…') {
     if (source instanceof HTMLButtonElement) source.setAttribute('aria-busy', 'true');
     status.set(label);
     try {
-      await work();
+      await work(event);
       if (status.node.textContent === label) status.set('处理完成。', 'success');
     } catch (error) {
       status.set(error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/u, ''), 'error');

@@ -4,7 +4,7 @@ import '@fontsource/ibm-plex-mono/600.css';
 import logo from '../assets/icon.png';
 import { version } from '../package.json';
 import './styles.css';
-import { button, el, icon, iconButton, input, makeStatus, task } from './ui.js';
+import { button, check, el, field, icon, iconButton, input, makeStatus, readableSize, select, task } from './ui.js';
 import { developerTools } from './tools/developer.js';
 import { textTools } from './tools/text.js';
 import { mediaTools } from './tools/media.js';
@@ -23,6 +23,22 @@ const tools = groups.flatMap((group) => group.tools.map((tool) => ({ ...tool, gr
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
 const featured = ['video', 'json', 'image', 'pdf'];
 const state = { route: 'home', tool: null, back: null, query: '', mode: 'simple', pinned: false, shortcut: false, ready: false, update: null };
+const defaults = { mode: 'simple', density: 'normal', motion: true, autoCheck: true, close: 'tray' };
+const preferenceKey = 'jinkra.preferences';
+function readPreferences() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(preferenceKey)) ?? {};
+    return {
+      mode: stored.mode === 'pro' ? 'pro' : 'simple',
+      density: stored.density === 'compact' ? 'compact' : 'normal',
+      motion: stored.motion !== false, autoCheck: stored.autoCheck !== false,
+      close: stored.close === 'quit' ? 'quit' : 'tray',
+    };
+  } catch {
+    return { ...defaults };
+  }
+}
+const preferences = readPreferences();
 
 function readList(key) {
   try {
@@ -45,6 +61,9 @@ const frame = el('div', { class: `app-frame${globalThis.desktop ? ' is-desktop' 
 const windowBar = el('header', { class: 'window-bar' });
 const workspace = el('div', { class: 'workspace' });
 const dialog = el('dialog', { class: 'about' });
+const settingsDialog = el('dialog', { class: 'about settings-dialog' });
+const modeToast = el('div', { class: 'mode-toast', role: 'status', 'aria-live': 'polite', hidden: true });
+let modeToastTimeout;
 
 function creatorLink(text) {
   return el('a', { href: 'https://jinkra.slatt.cn/', target: '_blank', rel: 'noopener noreferrer', onclick: (event) => {
@@ -173,9 +192,17 @@ function title(name, description) {
 
 function home() {
   return [
-    el('header', { class: 'home-intro' },
-      el('div', {}, el('h1', { tabindex: '-1' }, '工具总览'), el('p', {}, `${tools.length} 个工具`)),
-      button('查找工具', () => { search.focus(); search.select(); }, 'secondary', 'Search')),
+    el('header', { class: 'home-hero' },
+      el('div', { class: 'home-hero-copy' },
+        el('div', { class: 'hero-meta' }, icon('Grid2X2', 14), 'Windows 便携版'),
+        el('h1', { tabindex: '-1' }, 'Jinkra 工具箱'),
+        el('div', { class: 'hero-facts' }, el('span', {}, `版本 ${version}`), el('span', {}, `${tools.length} 个工具`)),
+        button('查找工具', () => { search.focus(); search.select(); }, 'secondary', 'Search')),
+      el('div', { class: 'hero-portrait' }, el('div', { class: 'hero-orbit' },
+        el('img', { src: logo, alt: 'Jinkra 头像' })),
+        el('span', { class: 'hero-mark code' }, icon('CodeXml', 19)),
+        el('span', { class: 'hero-mark media' }, icon('Image', 19)),
+        el('span', { class: 'hero-mark files' }, icon('FileText', 17)))),
     el('section', { class: 'launchpad' },
       el('header', {}, el('h2', {}, recents.length ? '最近使用' : '常用工具'),
         recents.length > 0 && button('查看全部', () => navigate('recent'), 'quiet', 'ArrowRight')),
@@ -231,13 +258,27 @@ const simple = button('简单版', () => setMode('simple'), 'quiet');
 const professional = button('专业版', () => setMode('pro'), 'quiet');
 const modeSwitcher = el('div', { class: 'mode-switch', role: 'group', 'aria-label': '工具模式' }, simple, professional);
 function setMode(mode) {
+  const changed = state.mode !== mode;
   state.mode = mode;
   document.documentElement.dataset.experience = mode;
   simple.setAttribute('aria-pressed', String(mode === 'simple'));
   professional.setAttribute('aria-pressed', String(mode === 'pro'));
   content.querySelector('.surface')?.dispatchEvent(new Event('tool-mode-changed'));
+  if (state.ready && changed) {
+    clearTimeout(modeToastTimeout);
+    modeToast.hidden = false;
+    modeToast.replaceChildren(icon('Check', 15), `已切换为${mode === 'simple' ? '简单版' : '专业版'}`);
+    modeToastTimeout = setTimeout(() => { modeToast.hidden = true; }, 2300);
+  }
 }
-setMode('simple');
+setMode(preferences.mode);
+
+function applyPreferences() {
+  document.documentElement.dataset.density = preferences.density;
+  document.documentElement.dataset.motion = preferences.motion ? 'on' : 'off';
+  if (state.ready && globalThis.desktop) void desktop.windowCloseBehavior(preferences.close).catch(() => {});
+}
+applyPreferences();
 
 const pin = iconButton('Pin', '窗口置顶', async () => {
   state.pinned = await desktop.windowPin();
@@ -256,10 +297,42 @@ function openAbout() {
       globalThis.desktop && [el('dt', {}, '从任意应用打开工具箱'),
         el('dd', {}, state.shortcut ? el('kbd', {}, 'Ctrl + Alt + J') : '快捷键不可用')],
       el('dt', {}, '工具模式'), el('dd', {}, '右上角切换简单版和专业版，当前工具的输入会保留。'),
-      globalThis.desktop && [el('dt', {}, '退出程序'), el('dd', {}, '关闭窗口会收起到系统托盘。使用托盘菜单退出程序。')]),
+      globalThis.desktop && [el('dt', {}, '关闭窗口'), el('dd', {}, preferences.close === 'quit' ? '直接退出程序。' : '收起到系统托盘。使用托盘菜单可退出程序。')]),
     globalThis.desktop && button('收起到托盘', async () => { dialog.close(); await desktop.windowHide(); }, 'secondary'),
   );
   dialog.showModal();
+}
+
+function openSettings() {
+  const mode = select([['simple', '简单版'], ['pro', '专业版']]);
+  mode.value = preferences.mode;
+  const density = select([['normal', '标准'], ['compact', '紧凑']]);
+  density.value = preferences.density;
+  const [motionLabel, motion] = check('播放启动和切换动画', preferences.motion);
+  const [autoLabel, auto] = check('启动后自动检查更新', preferences.autoCheck);
+  const close = select([['tray', '收起到系统托盘'], ['quit', '直接退出软件']]);
+  close.value = preferences.close;
+  const set = (key, value) => {
+    preferences[key] = value;
+    localStorage.setItem(preferenceKey, JSON.stringify(preferences));
+    applyPreferences();
+    if (key === 'mode') setMode(value);
+    if (key === 'autoCheck' && value && globalThis.desktop) void desktop.checkUpdate().then(showUpdateResult).catch(() => {});
+  };
+  for (const [key, control] of [['mode', mode], ['density', density], ['motion', motion], ['autoCheck', auto], ['close', close]]) {
+    control.addEventListener('change', () => set(key, control.type === 'checkbox' ? control.checked : control.value));
+  }
+  const preferencesGroup = (title, ...children) => el('section', { class: 'settings-group' }, el('h3', {}, title), children);
+  settingsDialog.replaceChildren(
+    el('div', { class: 'dialog-title' }, el('h2', {}, '设置'), iconButton('X', '关闭设置', () => settingsDialog.close())),
+    preferencesGroup('界面与工具', el('div', { class: 'settings-fields' }, field('默认工具模式', mode), field('布局密度', density)), motionLabel),
+    globalThis.desktop && preferencesGroup('桌面行为', field('关闭窗口时', close),
+      button('查看快捷方式', () => { settingsDialog.close(); openAbout(); }, 'quiet', 'CircleHelp')),
+    globalThis.desktop && preferencesGroup('软件更新',
+      el('div', { class: 'settings-update' }, el('p', { class: 'hint' }, `当前版本 ${version}`),
+        button('检查更新', () => { settingsDialog.close(); openUpdate(false); }, 'secondary', 'ArrowDownUp')), autoLabel),
+  );
+  settingsDialog.showModal();
 }
 
 search.addEventListener('input', () => setQuery(search.value));
@@ -271,7 +344,7 @@ search.addEventListener('keydown', (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
-  if (state.ready && !dialog.open && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+  if (state.ready && !document.querySelector('dialog[open]') && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault();
     search.focus();
     search.select();
@@ -280,7 +353,7 @@ document.addEventListener('keydown', (event) => {
 
 const topControls = el('div', { class: 'header-controls', hidden: true },
   el('div', { class: 'searchbox' }, icon('Search', 16), search, keycap, clear),
-  modeSwitcher, globalThis.desktop && pin, iconButton('CircleHelp', '桌面快捷方式', openAbout));
+  modeSwitcher, globalThis.desktop && pin, iconButton('Settings2', '设置', openSettings));
 windowBar.append(brand(), topControls);
 const updateButton = button('发现新版', () => openUpdate(true), 'secondary', 'ArrowDownUp');
 updateButton.classList.add('update-button');
@@ -289,13 +362,12 @@ const versionLabel = el(globalThis.desktop ? 'button' : 'span', {
   class: 'sidebar-version', type: globalThis.desktop ? 'button' : null,
   title: globalThis.desktop ? '检查更新' : null, onclick: globalThis.desktop ? () => openUpdate(false) : null,
 }, `版本号：${version}`);
-workspace.append(el('aside', { class: 'sidebar' }, navigation, el('footer', { class: 'sidebar-footer' },
-  updateButton,
-  el('div', { class: 'version-line' }, versionLabel, el('span', { class: 'activated-label' }, '已激活')))), content);
-workspace.hidden = true;
-const copyright = el('footer', { class: 'app-copyright' },
+const copyright = el('p', { class: 'app-copyright' },
   '© 2026 Jinkra . All Rights Reserved. | Made by ', creatorLink('Jinkra'));
-frame.append(windowBar, workspace, dialog, copyright);
+workspace.append(el('aside', { class: 'sidebar' }, navigation, el('footer', { class: 'sidebar-footer' }, updateButton,
+  el('div', { class: 'version-line' }, versionLabel, el('span', { class: 'activated-label' }, '已激活')), copyright)), content);
+workspace.hidden = true;
+frame.append(windowBar, workspace, dialog, settingsDialog, modeToast);
 root.append(frame);
 
 const updateDialog = el('dialog', { class: 'about update-dialog' });
@@ -311,26 +383,35 @@ function openUpdate(known, message = '') {
   if (updateDialog.open) return;
   const status = makeStatus();
   const progress = el('progress', { max: 100, hidden: true, 'aria-label': '下载进度' });
+  const downloadInfo = el('div', { class: 'download-info', hidden: true },
+    el('span', { class: 'download-size' }), el('span', { class: 'download-speed' }));
   const close = iconButton('X', '关闭更新提示', () => updateDialog.close());
   const updateBody = el('div', { class: 'update-body' });
   const draw = (update) => {
-    updateBody.replaceChildren(update
+    updateBody.replaceChildren(...(update
       ? [el('p', {}, `当前版本 ${version}，最新版本 ${update.version}。`),
         el('p', { class: 'hint' }, update.canInstall ? '更新后会重新打开软件，首次使用新版本需要重新激活。' : '请用便携 EXE 打开工具箱进行更新。'),
         update.canInstall && button('下载并更新', task(status, async (event) => {
-          event.currentTarget.disabled = true;
+          const action = event.currentTarget;
+          action.disabled = true;
           close.disabled = true;
           progress.hidden = false;
+          downloadInfo.hidden = true;
           progress.removeAttribute('value');
           updateDialog.oncancel = (cancel) => cancel.preventDefault();
-          const unsubscribe = desktop.onUpdateProgress((percent) => {
-            if (percent >= 0) progress.value = percent;
-            status.set(percent === 100 ? '校验通过，正在重新启动。' : percent >= 0 ? `正在下载 · ${percent}%` : '正在下载新版…');
+          const unsubscribe = desktop.onUpdateProgress(({ stage, received, total, speed }) => {
+            downloadInfo.hidden = false;
+            downloadInfo.children[0].textContent = total ? `${readableSize(received)} / ${readableSize(total)}` : `已下载 ${readableSize(received)}`;
+            downloadInfo.children[1].textContent = stage === 'download' ? `${readableSize(speed)}/秒` : '';
+            const percent = total ? Math.min(100, Math.floor(received * 100 / total)) : null;
+            if (percent !== null) progress.value = percent;
+            status.set(stage === 'verify' ? '下载完成，正在校验 SHA-256…' : stage === 'restart' ? '校验通过，正在重新启动…'
+              : percent === null ? '正在下载新版…' : `下载进度 ${percent}%`);
           });
           try {
             await desktop.installUpdate();
           } catch (error) {
-            event.currentTarget.disabled = false;
+            action.disabled = false;
             close.disabled = false;
             updateDialog.oncancel = null;
             progress.hidden = true;
@@ -338,10 +419,10 @@ function openUpdate(known, message = '') {
           } finally {
             unsubscribe();
           }
-        }, '正在下载新版…'), 'primary', 'ArrowDownUp')]
-      : el('p', {}, `当前已是最新版本 ${version}。`));
+        }, '正在连接 GitHub…'), 'primary', 'ArrowDownUp')].filter(Boolean)
+      : [el('p', {}, `当前已是最新版本 ${version}。`)]));
   };
-  updateDialog.replaceChildren(el('div', { class: 'dialog-title' }, el('h2', {}, '软件更新'), close), updateBody, progress, status.node);
+  updateDialog.replaceChildren(el('div', { class: 'dialog-title' }, el('h2', {}, '软件更新'), close), updateBody, progress, downloadInfo, status.node);
   updateDialog.showModal();
   if (message) status.set(message, 'error');
   else if (known && state.update) draw(state.update);
@@ -357,6 +438,7 @@ function openUpdate(known, message = '') {
 function enter() {
   frame.querySelector('.gateway')?.remove();
   state.ready = true;
+  applyPreferences();
   topControls.hidden = false;
   workspace.hidden = false;
   syncSearch();
@@ -368,7 +450,7 @@ function enter() {
   }).catch(() => {});
   if (globalThis.desktop) {
     void desktop.updateError().then((message) => { if (message) openUpdate(false, message); }).catch(() => {});
-    void desktop.checkUpdate().then(showUpdateResult).catch(() => {});
+    if (preferences.autoCheck) void desktop.checkUpdate().then(showUpdateResult).catch(() => {});
   }
 }
 
@@ -406,7 +488,7 @@ async function start() {
   try {
     const [activation] = await Promise.all([
       globalThis.desktop ? desktop.activationState() : { active: true },
-      new Promise((resolve) => setTimeout(resolve, 820)),
+      new Promise((resolve) => setTimeout(resolve, preferences.motion ? 820 : 100)),
     ]);
     if (activation.active) enter();
     else lock();

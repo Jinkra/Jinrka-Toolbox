@@ -29,6 +29,7 @@ const icon = app.isPackaged
 let window;
 let tray;
 let quitting = false;
+let closeBehavior = 'tray';
 let shortcutRegistered = false;
 let renameInProgress = false;
 let videoJob;
@@ -54,7 +55,11 @@ function setupWindow() {
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   window.on('close', (event) => {
-    if (!quitting && tray) {
+    if (quitting) return;
+    if (closeBehavior === 'quit') {
+      event.preventDefault();
+      app.quit();
+    } else if (tray) {
       event.preventDefault();
       window.hide();
     }
@@ -176,6 +181,7 @@ function setupIpc() {
   ipc('clipboard:read', () => clipboard.readText());
   ipc('clipboard:write', (value) => clipboard.writeText(String(value)));
   ipc('window:state', () => ({ pinned: window.isAlwaysOnTop(), shortcutRegistered }), false);
+  ipc('window:close-behavior', (value) => { closeBehavior = value === 'quit' ? 'quit' : 'tray'; });
   ipc('window:pin', () => {
     window.setAlwaysOnTop(!window.isAlwaysOnTop());
     return window.isAlwaysOnTop();

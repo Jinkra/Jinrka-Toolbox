@@ -6,6 +6,7 @@ const { lstat, mkdtemp, readFile, rm } = require('node:fs/promises');
 const path = require('node:path');
 const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
+const { setTimeout: delay } = require('node:timers/promises');
 
 const { version } = require('../package.json');
 const repo = '/Jinkra/Jinrka-Toolbox';
@@ -54,7 +55,9 @@ async function readLatest() {
   if (!location) throw new Error('暂时无法查询 GitHub 版本。');
   const target = new URL(location, homepage);
   const prefix = repo + '/releases/tag/';
-  if (target.origin !== 'https://github.com' || !target.pathname.startsWith(prefix)) throw new Error('GitHub 版本地址无效。');
+  if (target.origin !== 'https://github.com') throw new Error('GitHub 版本地址无效。');
+  if (target.pathname.toLowerCase() === (repo + '/releases').toLowerCase()) return null;
+  if (!target.pathname.toLowerCase().startsWith(prefix.toLowerCase())) throw new Error('GitHub 版本地址无效。');
   const tag = target.pathname.slice(prefix.length);
   if (!newer(tag)) return null;
   const filename = `Jinkra-Toolbox-${tag.slice(1)}-x64.exe`;
@@ -90,40 +93,6 @@ async function checkUpdate() {
   return result ? { version: result.version, canInstall: Boolean(process.env.PORTABLE_EXECUTABLE_FILE) } : null;
 }
 
-// The portable launcher can keep its own EXE open until Electron exits.
-// A detached helper waits for that handle and replaces the file on the same volume.
-const replaceScript = String.raw`
-$ErrorActionPreference = 'Stop'
-$target = $env:JINKRA_UPDATE_TARGET
-$source = $env:JINKRA_UPDATE_STAGED
-$backup = $source + '.rollback'
-$replaced = $false
-try {
-  for ($attempt=0; $attempt -lt 120; $attempt++) {
-    try {
-      [IO.File]::Replace($source, $target, $backup)
-      $replaced = $true
-      break
-    } catch [IO.IOException] {
-      if ($attempt -eq 119) { throw }
-      Start-Sleep -Milliseconds 250
-    }
-  }
-  Start-Process -FilePath $target -WorkingDirectory ([IO.Path]::GetDirectoryName($target))
-  [IO.File]::Delete($backup)
-} catch {
-  [IO.File]::WriteAllText($env:JINKRA_UPDATE_ERROR, '更新未完成，已尝试保留原版本。请检查程序所在目录的写入权限。')
-  if ($replaced -and [IO.File]::Exists($backup)) {
-    try { [IO.File]::Replace($backup, $target, $null) } catch { exit 1 }
-  }
-  Start-Process -FilePath $target -WorkingDirectory ([IO.Path]::GetDirectoryName($target))
-} finally {
-  [IO.File]::Delete($source)
-  $folder = [IO.Path]::GetDirectoryName($source)
-  if ([IO.Directory]::GetFileSystemEntries($folder).Length -eq 0) { [IO.Directory]::Delete($folder) }
-}
-`;
-
 async function getUpdateError() {
   const file = errorFile();
   try {
@@ -154,31 +123,53 @@ async function installUpdate(report) {
     const total = Number(response.headers.get('content-length')) || 0;
     const hash = createHash('sha256');
     let size = 0;
-    let last = -1;
+    let speed = 0;
+    let sampleBytes = 0;
+    let sampleTime = performance.now();
+    report({ stage: 'download', received: 0, total, speed: 0 });
     await pipeline(response.body, new Transform({
       transform(chunk, _encoding, callback) {
         size += chunk.length;
         if (size > maxBytes) return callback(new Error('更新包尺寸无效。'));
         hash.update(chunk);
-        const percent = total ? Math.min(99, Math.floor(size / total * 100)) : -1;
-        if (percent !== last) { last = percent; report(percent); }
+        const now = performance.now();
+        if (now - sampleTime >= 330) {
+          const rate = (size - sampleBytes) * 1000 / (now - sampleTime);
+          speed = speed ? .65 * speed + .35 * rate : rate;
+          sampleBytes = size;
+          sampleTime = now;
+          report({ stage: 'download', received: size, total, speed });
+        }
         callback(null, chunk);
       },
     }), createWriteStream(staged, { flags: 'wx' }));
-    if (size < 4096 || hash.digest('hex') !== update.digest) throw new Error('更新文件损坏，SHA-256 校验未通过。');
-    const shell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    const command = Buffer.from(replaceScript, 'utf16le').toString('base64');
-    const helper = spawn(shell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', command], {
+    report({ stage: 'verify', received: size, total: total || size, speed: 0 });
+    if (size < 4096 || (total && total !== size) || hash.digest('hex') !== update.digest) {
+      throw new Error('更新文件损坏，SHA-256 校验未通过。');
+    }
+    const worker = app.isPackaged ? path.join(process.resourcesPath, 'jinkra-updater.exe')
+      : path.resolve(__dirname, '../vendor/updater/jinkra-updater.exe');
+    const ready = path.join(folder, 'ready');
+    const helper = spawn(worker, [], {
       detached: true, windowsHide: true, stdio: 'ignore',
-      env: { ...process.env, JINKRA_UPDATE_TARGET: target, JINKRA_UPDATE_STAGED: staged, JINKRA_UPDATE_ERROR: errorFile() },
+      env: { ...process.env, JINKRA_UPDATE_TARGET: target, JINKRA_UPDATE_STAGED: staged, JINKRA_UPDATE_ERROR: errorFile(),
+        JINKRA_UPDATE_READY: ready, JINKRA_UPDATE_PARENT: String(process.pid) },
     });
-    await new Promise((resolve, reject) => {
-      helper.once('spawn', resolve);
-      helper.once('error', reject);
-    });
+    let helperError;
+    helper.once('error', (error) => { helperError = error; });
+    let waiting = true;
+    for (let retries = 0; retries < 35; retries++) {
+      if (await lstat(ready).then(() => true, () => false)) { waiting = false; break; }
+      if (helperError || helper.exitCode !== null) break;
+      await delay(200);
+    }
+    if (waiting) {
+      helper.kill();
+      throw new Error('无法启动 Windows 更新组件，请从 GitHub 重新下载便携版。');
+    }
     helper.unref();
     handedOff = true;
-    report(100);
+    report({ stage: 'restart', received: size, total: size, speed: 0 });
     setTimeout(() => app.quit(), 450);
   } finally {
     if (!handedOff && folder) await rm(folder, { recursive: true, force: true });

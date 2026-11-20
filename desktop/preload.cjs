@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('desktop', {
   clipboardRead: invoke('clipboard:read'),
   clipboardWrite: invoke('clipboard:write'),
   windowState: invoke('window:state'),
+  windowCloseBehavior: invoke('window:close-behavior'),
   windowPin: invoke('window:pin'),
   windowHide: invoke('window:hide'),
 });

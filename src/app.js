@@ -22,7 +22,7 @@ const groups = [
 const tools = groups.flatMap((group) => group.tools.map((tool) => ({ ...tool, group })));
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
 const featured = ['video', 'json', 'image', 'pdf'];
-const state = { route: 'home', tool: null, back: null, query: '', mode: 'simple', pinned: false, shortcut: false, ready: false };
+const state = { route: 'home', tool: null, back: null, query: '', mode: 'simple', pinned: false, shortcut: false, ready: false, update: null };
 
 function readList(key) {
   try {
@@ -45,6 +45,14 @@ const frame = el('div', { class: `app-frame${globalThis.desktop ? ' is-desktop' 
 const windowBar = el('header', { class: 'window-bar' });
 const workspace = el('div', { class: 'workspace' });
 const dialog = el('dialog', { class: 'about' });
+
+function creatorLink(text) {
+  return el('a', { href: 'https://jinkra.slatt.cn/', target: '_blank', rel: 'noopener noreferrer', onclick: (event) => {
+    if (!globalThis.desktop) return;
+    event.preventDefault();
+    void desktop.openCreator();
+  } }, text);
+}
 
 function brand() {
   return el('button', { type: 'button', class: 'brand', onclick: () => { if (state.ready) navigate('home'); }, 'aria-label': 'Jinkra 工具箱首页' },
@@ -163,24 +171,15 @@ function title(name, description) {
   return el('header', { class: 'page-intro' }, el('h1', { tabindex: '-1' }, name), el('p', {}, description));
 }
 
-function welcome() {
-  return el('section', { class: 'hero' },
-    el('div', { class: 'hero-copy' },
-      el('div', { class: 'hero-tag' }, icon('ShieldCheck', 15), '离线工作台'),
-      el('h1', { tabindex: '-1' }, '工具工作台'),
-      el('p', {}, `${tools.length} 个本地工具，涵盖开发、文本、媒体、文件和日常效率。`),
-      button('查找工具', () => { search.focus(); search.select(); }, 'primary', 'Search')),
-    el('aside', { class: 'hero-deck', 'aria-label': '快捷入口' },
-      el('header', {}, el('strong', {}, '快捷入口'), el('span', {}, icon('Layers3', 16))),
-      featured.map((id) => quickCard(byId.get(id)))),
-  );
-}
-
 function home() {
   return [
-    welcome(),
-    recents.length > 0 && section('最近使用', el('div', { class: 'quick-grid' }, recents.slice(0, 4).map((id) => quickCard(byId.get(id)))),
-      button('查看全部', () => navigate('recent'), 'quiet', 'ArrowRight')),
+    el('header', { class: 'home-intro' },
+      el('div', {}, el('h1', { tabindex: '-1' }, '工具总览'), el('p', {}, `${tools.length} 个工具`)),
+      button('查找工具', () => { search.focus(); search.select(); }, 'secondary', 'Search')),
+    el('section', { class: 'launchpad' },
+      el('header', {}, el('h2', {}, recents.length ? '最近使用' : '常用工具'),
+        recents.length > 0 && button('查看全部', () => navigate('recent'), 'quiet', 'ArrowRight')),
+      el('div', { class: 'quick-grid' }, (recents.length ? recents : featured).slice(0, 4).map((id) => quickCard(byId.get(id))))),
     section('按分类浏览', el('div', { class: 'category-grid' }, groups.map((group) =>
       el('button', { type: 'button', class: 'category-card', onclick: () => navigate(group.id) },
         toolIcon({ group, icon: group.icon }, 20), el('strong', {}, group.title), el('span', {}, `${group.tools.length} 个工具`))))),
@@ -283,12 +282,77 @@ const topControls = el('div', { class: 'header-controls', hidden: true },
   el('div', { class: 'searchbox' }, icon('Search', 16), search, keycap, clear),
   modeSwitcher, globalThis.desktop && pin, iconButton('CircleHelp', '桌面快捷方式', openAbout));
 windowBar.append(brand(), topControls);
+const updateButton = button('发现新版', () => openUpdate(true), 'secondary', 'ArrowDownUp');
+updateButton.classList.add('update-button');
+updateButton.hidden = true;
+const versionLabel = el(globalThis.desktop ? 'button' : 'span', {
+  class: 'sidebar-version', type: globalThis.desktop ? 'button' : null,
+  title: globalThis.desktop ? '检查更新' : null, onclick: globalThis.desktop ? () => openUpdate(false) : null,
+}, `版本号：${version}`);
 workspace.append(el('aside', { class: 'sidebar' }, navigation, el('footer', { class: 'sidebar-footer' },
-  el('div', { class: 'offline-status' }, el('i'), el('span', {}, '本地运行')),
-  el('span', { class: 'sidebar-version' }, `v${version}`))), content);
+  updateButton,
+  el('div', { class: 'version-line' }, versionLabel, el('span', { class: 'activated-label' }, '已激活')))), content);
 workspace.hidden = true;
-frame.append(windowBar, workspace, dialog);
+const copyright = el('footer', { class: 'app-copyright' },
+  '© 2026 Jinkra . All Rights Reserved. | Made by ', creatorLink('Jinkra'));
+frame.append(windowBar, workspace, dialog, copyright);
 root.append(frame);
+
+const updateDialog = el('dialog', { class: 'about update-dialog' });
+frame.append(updateDialog);
+
+function showUpdateResult(update) {
+  state.update = update;
+  updateButton.hidden = !update;
+  updateButton.lastChild.textContent = update ? `更新至 ${update.version}` : '发现新版';
+}
+
+function openUpdate(known, message = '') {
+  if (updateDialog.open) return;
+  const status = makeStatus();
+  const progress = el('progress', { max: 100, hidden: true, 'aria-label': '下载进度' });
+  const close = iconButton('X', '关闭更新提示', () => updateDialog.close());
+  const updateBody = el('div', { class: 'update-body' });
+  const draw = (update) => {
+    updateBody.replaceChildren(update
+      ? [el('p', {}, `当前版本 ${version}，最新版本 ${update.version}。`),
+        el('p', { class: 'hint' }, update.canInstall ? '更新后会重新打开软件，首次使用新版本需要重新激活。' : '请用便携 EXE 打开工具箱进行更新。'),
+        update.canInstall && button('下载并更新', task(status, async (event) => {
+          event.currentTarget.disabled = true;
+          close.disabled = true;
+          progress.hidden = false;
+          progress.removeAttribute('value');
+          updateDialog.oncancel = (cancel) => cancel.preventDefault();
+          const unsubscribe = desktop.onUpdateProgress((percent) => {
+            if (percent >= 0) progress.value = percent;
+            status.set(percent === 100 ? '校验通过，正在重新启动。' : percent >= 0 ? `正在下载 · ${percent}%` : '正在下载新版…');
+          });
+          try {
+            await desktop.installUpdate();
+          } catch (error) {
+            event.currentTarget.disabled = false;
+            close.disabled = false;
+            updateDialog.oncancel = null;
+            progress.hidden = true;
+            throw error;
+          } finally {
+            unsubscribe();
+          }
+        }, '正在下载新版…'), 'primary', 'ArrowDownUp')]
+      : el('p', {}, `当前已是最新版本 ${version}。`));
+  };
+  updateDialog.replaceChildren(el('div', { class: 'dialog-title' }, el('h2', {}, '软件更新'), close), updateBody, progress, status.node);
+  updateDialog.showModal();
+  if (message) status.set(message, 'error');
+  else if (known && state.update) draw(state.update);
+  else {
+    status.set('正在查询 GitHub…');
+    void desktop.checkUpdate().then((update) => {
+      showUpdateResult(update);
+      if (status.node.isConnected) { status.set(''); draw(update); }
+    }).catch(() => status.set('暂时无法连接 GitHub，请稍后再试。', 'error'));
+  }
+}
 
 function enter() {
   frame.querySelector('.gateway')?.remove();
@@ -302,6 +366,10 @@ function enter() {
     state.shortcut = desktopState.shortcutRegistered;
     paintPin();
   }).catch(() => {});
+  if (globalThis.desktop) {
+    void desktop.updateError().then((message) => { if (message) openUpdate(false, message); }).catch(() => {});
+    void desktop.checkUpdate().then(showUpdateResult).catch(() => {});
+  }
 }
 
 function lock() {
@@ -320,16 +388,20 @@ function lock() {
   }, '正在验证…');
   form.addEventListener('submit', (event) => { event.preventDefault(); void activate(event); });
   frame.querySelector('.gateway').replaceWith(el('div', { class: 'gateway page-enter' },
-    el('section', { class: 'gateway-card' }, el('img', { class: 'launch-logo', src: logo, alt: '' }),
-      el('p', { class: 'gateway-version' }, `JINKRA / ${version}`),
-      el('h1', {}, '激活工具箱'), el('p', {}, '输入激活码以解锁当前版本。每次更新后需重新激活。'), form)));
+    el('section', { class: 'gateway-card' },
+      el('div', { class: 'gateway-brand' }, el('img', { class: 'launch-logo', src: logo, alt: '' }),
+        el('strong', {}, 'Jinkra'), el('p', { class: 'gateway-version' }, `版本号：${version}`)),
+      el('div', { class: 'gateway-content' }, el('h1', {}, '激活工具箱'),
+        el('p', {}, '输入激活码后即可使用当前版本。'), form,
+        el('p', { class: 'activation-link' }, '获取激活码请前往：', creatorLink('jinkra.slatt.cn'))))));
   code.focus();
 }
 
 async function start() {
   const boot = el('div', { class: 'gateway' }, el('section', { class: 'boot-content', role: 'status' },
-    el('img', { class: 'launch-logo boot-logo', src: logo, alt: '' }),
-    el('h1', {}, 'Jinkra'), el('p', {}, '正在启动工作台'), el('div', { class: 'boot-progress' })));
+    el('div', { class: 'boot-mark' }, el('img', { class: 'launch-logo boot-logo', src: logo, alt: '' }),
+      el('div', {}, el('h1', {}, 'Jinkra 工具箱'), el('p', {}, '正在启动…'))),
+    el('div', { class: 'boot-progress' })));
   frame.append(boot);
   try {
     const [activation] = await Promise.all([

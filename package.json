@@ -1,6 +1,6 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Jinkra 工具箱 · Windows 便携离线工具",
   "author": "Jinkra",
@@ -21,6 +21,13 @@
     "appId": "com.jinkra.toolbox",
     "productName": "Jinkra 工具箱",
     "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
     "npmRebuild": false,
     "compression": "normal",
     "directories": {

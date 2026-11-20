@@ -1,10 +1,12 @@
 # Jinkra 工具箱
 
-面向 Windows 10/11 x64 的个人离线工具箱。单个可执行文件自带 Electron 和 FFmpeg，运行时无需登录、联网或另外安装运行库。
+面向 Windows 10/11 x64 的个人工具箱。单个可执行文件自带 Electron 和 FFmpeg，工具处理在本机完成，无需登录或另外安装运行库。检查和下载更新时访问 GitHub。
 
 ## 运行
 
 从 [GitHub Releases](https://github.com/Jinkra/Jinrka-Toolbox/releases/latest) 获取便携 EXE，双击即可打开。启动时会把内置组件解压到 Windows 临时目录。首次打开每个版本需要输入激活码，激活记录保存在本机。程序未做数字签名。
+
+激活码获取入口见 [Jinkra 官网](https://jinkra.slatt.cn/)。程序启动后检查 GitHub 最新发行版。发现新版时，点击左下角更新按钮即可下载，并在通过 SHA-256 校验后替换当前便携 EXE、重新启动。版本号也可用于手动检查更新。
 
 `Ctrl + K` 搜索工具。`Ctrl + Alt + J` 从其他应用唤出窗口。默认使用简单版，右上角可切换到专业版并保留当前输入。点击图钉可切换置顶。关闭窗口会收起到系统托盘，退出应用请用托盘菜单。
 

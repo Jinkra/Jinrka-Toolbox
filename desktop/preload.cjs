@@ -4,6 +4,15 @@ const invoke = (command) => (...args) => ipcRenderer.invoke(`toolbox:${command}`
 contextBridge.exposeInMainWorld('desktop', {
   activationState: invoke('activation:state'),
   activate: invoke('activation:submit'),
+  openCreator: invoke('creator:open'),
+  checkUpdate: invoke('update:check'),
+  updateError: invoke('update:error'),
+  installUpdate: invoke('update:install'),
+  onUpdateProgress: (callback) => {
+    const handler = (_event, percent) => callback(percent);
+    ipcRenderer.on('toolbox:update:progress', handler);
+    return () => ipcRenderer.removeListener('toolbox:update:progress', handler);
+  },
   pickFiles: invoke('files'),
   zipCreate: invoke('zip:create'),
   zipExtract: invoke('zip:extract'),

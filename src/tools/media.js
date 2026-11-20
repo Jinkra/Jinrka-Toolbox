@@ -158,7 +158,7 @@ function imageTool() {
   const speed = input({ type: 'number', min: 0.25, max: 4, step: 0.25, value: 1 });
   const stride = input({ type: 'number', min: 1, max: 60, value: 1 });
   const [gpsLabel, gps] = check('包含 GPS、IPTC 和 XMP 元数据');
-  const settings = el('div');
+  const settings = el('div', { class: 'tool-settings' });
   const preview = el('div', { class: 'media-preview', 'aria-live': 'polite' });
   const details = el('p', { class: 'hint' });
   const status = makeStatus();

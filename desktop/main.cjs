@@ -1,4 +1,4 @@
-const { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, net, protocol, Tray } = require('electron');
+const { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, net, protocol, shell, Tray } = require('electron');
 const { randomUUID } = require('node:crypto');
 const { stat, writeFile } = require('node:fs/promises');
 const path = require('node:path');
@@ -6,6 +6,7 @@ const { pathToFileURL } = require('node:url');
 const { createZip, extractZip, hashFiles, planRenames, applyRenames, withOutput } = require('./files.cjs');
 const { convertVideo, inspectMedia } = require('./video.cjs');
 const { activate, activationState, loadActivation } = require('./activation.cjs');
+const { checkUpdate, getUpdateError, installUpdate } = require('./updater.cjs');
 
 const origin = 'app://jinkra';
 const dist = path.resolve(__dirname, '../dist');
@@ -45,7 +46,7 @@ function setupWindow() {
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#fffeff', symbolColor: '#344865', height: 52 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
-      contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false,
+      contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, devTools: !app.isPackaged,
     },
   });
   window.once('ready-to-show', showWindow);
@@ -97,6 +98,10 @@ async function pickSave(title, defaultPath, extensions) {
 function setupIpc() {
   ipc('activation:state', activationState, false);
   ipc('activation:submit', activate, false);
+  ipc('creator:open', () => shell.openExternal('https://jinkra.slatt.cn/'), false);
+  ipc('update:check', checkUpdate);
+  ipc('update:error', getUpdateError);
+  ipc('update:install', () => installUpdate((progress) => window.webContents.send('toolbox:update:progress', progress)));
   ipc('files', async (kind, multiple) => {
     if (!Object.hasOwn(fileFilters, kind)) throw new Error('不支持该文件类型。');
     const result = await dialog.showOpenDialog(window, {

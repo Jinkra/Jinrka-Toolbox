@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 版本标签
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,12 +17,18 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    concurrency:
+      group: windows-release-${{ inputs.tag || github.ref_name }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -25,7 +37,7 @@ jobs:
         shell: pwsh
         run: |
           $version = node -p "require('./package.json').version"
-          if ($env:GITHUB_REF_NAME -ne "v$version") { throw '版本标签与 package.json 不一致。' }
+          if ($env:RELEASE_TAG -ne "v$version") { throw '版本标签与 package.json 不一致。' }
       - name: 构建便携 EXE
         shell: pwsh
         run: |
@@ -43,4 +55,4 @@ jobs:
           $sha = "$exe.sha256"
           $digest = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content -LiteralPath $sha -Value "$digest  $name" -Encoding ascii
-          gh release create $env:GITHUB_REF_NAME $exe $sha --verify-tag --title "Jinkra 工具箱 $version" --generate-notes
+          gh release create $env:RELEASE_TAG $exe $sha --verify-tag --title "Jinkra 工具箱 $version" --generate-notes

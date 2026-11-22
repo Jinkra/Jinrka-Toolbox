@@ -41,8 +41,9 @@ kbd { border: 1px solid #cbd8ec; background: #edf3fb; color: #21436f; padding: 2
 .brand, .header-controls { display: flex; align-items: center; gap: 9px; }
 .brand { border: 0; padding: 2px 5px 2px 1px; border-radius: 6px; background: transparent; white-space: nowrap; }
 .brand-icon { display: block; border-radius: 6px; width: 27px; height: 27px; object-fit: cover; }
+.brand-wordmark { display: flex; align-items: center; gap: 5px; line-height: 1; }
 .brand strong { font-size: 18px; letter-spacing: -.6px; }
-.brand-label { margin-left: 5px; color: #52627b; font-size: 11px; font-weight: 700; }
+.brand-label { color: #52627b; font-size: 12px; font-weight: 700; }
 .header-controls { min-width: 0; }
 .searchbox {
   display: flex; align-items: center; gap: 8px; width: clamp(173px, 27vw, 365px); height: 34px;
@@ -197,6 +198,8 @@ button.sidebar-version:hover { color: var(--blue); text-decoration: underline; }
   transition: background .16s, transform .16s, border-color .16s; }
 .button:not(:disabled):active { transform: translateY(1px); }
 .button.secondary:hover:not(:disabled) { background: #d8e4f7; border-color: #87aad8; }
+.button.schedule-action { background: #e2f3eb; border-color: #b3d8c7; color: #215746; }
+.button.schedule-action:hover:not(:disabled) { background: #cfecdf; border-color: #87bfa7; }
 .button.primary { background: #285ba1; border-color: #285ba1; color: #ffffff; }
 .button.primary:hover:not(:disabled) { background: #174789; border-color: #174789; }
 .button.quiet { background: transparent; border-color: transparent; color: #3869af; }

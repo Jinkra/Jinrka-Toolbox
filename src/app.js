@@ -83,7 +83,7 @@ function creatorLink(text) {
 function brand() {
   return el('button', { type: 'button', class: 'brand', onclick: () => { if (state.ready) navigate('home'); }, 'aria-label': 'Jinkra 工具箱首页' },
     el('img', { class: 'brand-icon', src: logo, alt: '', width: 27, height: 27 }),
-    el('span', {}, el('strong', {}, 'Jinkra'), el('span', { class: 'brand-label' }, '工具箱')));
+    el('span', { class: 'brand-wordmark' }, el('strong', {}, 'Jinkra'), el('span', { class: 'brand-label' }, '工具箱')));
 }
 
 function navigationButton(id, label, symbol, count) {
@@ -206,7 +206,7 @@ function home() {
         el('div', { class: 'hero-facts' }, el('span', {}, `版本 ${version}`), el('span', {}, `${tools.length} 个工具`)),
         el('div', { class: 'hero-actions' },
           button('查找工具', () => { search.focus(); search.select(); }, 'secondary', 'Search'),
-          button('日程表', () => openTool(byId.get(agenda.id)), 'secondary', 'CalendarClock'))),
+          button('日程表', () => openTool(byId.get(agenda.id)), 'schedule-action', 'CalendarClock'))),
       el('div', { class: 'hero-portrait' }, el('div', { class: 'hero-orbit' },
         el('img', { src: logo, alt: 'Jinkra 头像' })),
         el('span', { class: 'hero-mark code' }, icon('CodeXml', 19)),

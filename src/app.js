@@ -2,6 +2,7 @@ import '@fontsource-variable/dm-sans/wght.css';
 import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import logo from '../assets/icon.png';
+import wechatPromotion from '../assets/wechat-promotion.png';
 import { version } from '../package.json';
 import './styles.css';
 import { button, check, el, field, icon, iconButton, input, makeStatus, readableSize, select, task } from './ui.js';
@@ -491,12 +492,14 @@ function lock() {
   }, '正在验证…');
   form.addEventListener('submit', (event) => { event.preventDefault(); void activate(event); });
   const activation = el('div', { class: 'gateway' },
-    el('section', { class: 'gateway-card' },
+    el('section', { class: 'gateway-card activation-card' },
       el('div', { class: 'gateway-brand' }, el('img', { class: 'launch-logo', src: logo, alt: '' }),
         el('strong', {}, 'Jinkra'), el('p', { class: 'gateway-version' }, `版本号：${version}`)),
       el('div', { class: 'gateway-content' }, el('h1', {}, '激活工具箱'),
         el('p', {}, '输入激活码后即可使用当前版本。'), form,
-        el('p', { class: 'activation-link' }, '获取激活码请前往：', creatorLink('jinkra.slatt.cn')))));
+        el('div', { class: 'activation-guide' },
+          el('p', {}, '微信搜索', el('strong', {}, '「都拓文化」'), '或扫描二维码关注公众号，获取激活码。'),
+          el('img', { src: wechatPromotion, alt: '都拓文化微信公众号二维码', width: 1710, height: 624 })))));
   reveal(activation);
   frame.append(activation);
   code.focus();

@@ -6,7 +6,7 @@ const path = require('node:path');
 const { withOutput } = require('./files.cjs');
 
 const { version } = require('../package.json');
-const keyDigest = Buffer.from('7dea8bf912cbb1d8dab2da13f58e91ab28b14c5bb5b31748cfac18c78afb6342', 'hex');
+const keyDigest = Buffer.from('03eff1d8b2ed11ce79a501d89f80f38d0ced70786a9cb986972230451ca0f13b', 'hex');
 const derive = promisify(scrypt);
 const receipt = 'Jinkra/activation/' + version;
 let active = false;

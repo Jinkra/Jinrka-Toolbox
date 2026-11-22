@@ -44,6 +44,11 @@ jobs:
           npm ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run dist
+      - name: 签名更新清单
+        shell: pwsh
+        env:
+          JINKRA_UPDATE_SIGNING_KEY: ${{ secrets.JINKRA_UPDATE_SIGNING_KEY }}
+        run: node scripts/sign-release.cjs
       - name: 发布到 GitHub Releases
         shell: pwsh
         env:
@@ -53,6 +58,4 @@ jobs:
           $name = "Jinkra-Toolbox-$version-x64.exe"
           $exe = Join-Path 'release' $name
           $sha = "$exe.sha256"
-          $digest = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -LiteralPath $sha -Value "$digest  $name" -Encoding ascii
-          gh release create $env:RELEASE_TAG $exe $sha --verify-tag --title "Jinkra 工具箱 $version" --generate-notes
+          gh release create $env:RELEASE_TAG $exe $sha 'release/jinkra-update.json' --verify-tag --title "Jinkra 工具箱 $version" --generate-notes

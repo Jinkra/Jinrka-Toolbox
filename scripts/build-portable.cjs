@@ -33,7 +33,12 @@ async function build() {
   const script = path.join(templates, 'portable.nsi');
   const template = readFileSync(script, 'utf8').replace(/\r\n/g, '\n');
   const beforeExtract = '  !insertmacro check64BitAndSetRegView\nFunctionEnd';
-  if (!template.includes(beforeExtract)) throw new Error('electron-builder 的便携启动模板已变更，请更新启动窗口接入点。');
+  const sharedDirectory = String.raw`  !ifdef UNPACK_DIR_NAME
+    StrCpy $INSTDIR "$TEMP\${UNPACK_DIR_NAME}"
+  !endif`;
+  if (!template.includes(beforeExtract) || !template.includes(sharedDirectory)) {
+    throw new Error('electron-builder 的便携启动模板已变更，请检查启动窗口与解压路径。');
+  }
   const splash = String.raw`
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
@@ -41,8 +46,10 @@ async function build() {
   System::Call 'kernel32::GetCurrentProcessId() i .r1'
   System::Call 'kernel32::SetEnvironmentVariable(t, t)i ("JINKRA_SPLASH_SIGNAL", "$PLUGINSDIR\jinkra-splash.ready").r0'
   Exec '"$PLUGINSDIR\jinkra-splash.exe" "$1" "$PLUGINSDIR\jinkra-splash.ready"'`;
-  writeFileSync(script, template.replace(beforeExtract, (line) => line.replace('\nFunctionEnd', () =>
-    splash.replace('@HELPER@', () => helper) + '\nFunctionEnd')));
+  // The bundled template defaults to one shared extraction directory per build.
+  // Keep $PLUGINSDIR\app so each launcher owns its running files and cleanup.
+  writeFileSync(script, template.replace(sharedDirectory + '\n', '').replace(beforeExtract, (line) =>
+    line.replace('\nFunctionEnd', () => splash.replace('@HELPER@', () => helper) + '\nFunctionEnd')));
   nsis.nsisTemplatesDir = templates;
   const { build: bundle, Platform, Arch } = require('electron-builder');
   const electronDist = process.env.JINKRA_ELECTRON_DIST;

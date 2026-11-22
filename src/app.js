@@ -405,14 +405,16 @@ function openUpdate(known, message = '') {
           downloadInfo.hidden = true;
           progress.removeAttribute('value');
           updateDialog.oncancel = (cancel) => cancel.preventDefault();
-          const unsubscribe = desktop.onUpdateProgress(({ stage, received, total, speed }) => {
-            downloadInfo.hidden = false;
+          const unsubscribe = desktop.onUpdateProgress(({ stage, received, total, speed, line }) => {
+            downloadInfo.hidden = stage === 'probe';
             downloadInfo.children[0].textContent = total ? `${readableSize(received)} / ${readableSize(total)}` : `已下载 ${readableSize(received)}`;
             downloadInfo.children[1].textContent = stage === 'download' ? `${readableSize(speed)}/秒` : '';
             const percent = total ? Math.min(100, Math.floor(received * 100 / total)) : null;
-            if (percent !== null) progress.value = percent;
-            status.set(stage === 'verify' ? '下载完成，正在校验 SHA-256…' : stage === 'restart' ? '校验通过，正在重新启动…'
-              : percent === null ? '正在下载新版…' : `下载进度 ${percent}%`);
+            if (stage === 'probe' || percent === null) progress.removeAttribute('value');
+            else progress.value = percent;
+            status.set(stage === 'probe' ? '正在测试更新线路…' : stage === 'switch' ? `正在切换到 ${line}…`
+              : stage === 'verify' ? '下载完成，正在校验 SHA-256…' : stage === 'restart' ? '校验通过，正在重新启动…'
+                : `${line} · 下载进度 ${percent}%`);
           });
           try {
             await desktop.installUpdate();
@@ -425,7 +427,7 @@ function openUpdate(known, message = '') {
           } finally {
             unsubscribe();
           }
-        }, '正在连接 GitHub…'), 'primary', 'ArrowDownUp')].filter(Boolean)
+        }, '正在测试更新线路…'), 'primary', 'ArrowDownUp')].filter(Boolean)
       : [el('p', {}, `当前已是最新版本 ${version}。`)]));
   };
   updateDialog.replaceChildren(el('div', { class: 'dialog-title' }, el('h2', {}, '软件更新'), close), updateBody, progress, downloadInfo, status.node);
@@ -437,7 +439,7 @@ function openUpdate(known, message = '') {
     void desktop.checkUpdate().then((update) => {
       showUpdateResult(update);
       if (status.node.isConnected) { status.set(''); draw(update); }
-    }).catch(() => status.set('暂时无法连接 GitHub，请稍后再试。', 'error'));
+    }).catch(() => status.set('暂时无法确认最新版本，请稍后重试。', 'error'));
   }
 }
 

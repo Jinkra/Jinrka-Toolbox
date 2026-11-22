@@ -11,7 +11,7 @@ const { checkUpdate, getUpdateError, installUpdate } = require('./updater.cjs');
 const { openRepo, openToolDocs, installTool } = require('./ai.cjs');
 const { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill, skillDetails } = require('./skills.cjs');
 const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = require('./system.cjs');
-const { appId, startupArg, loginStatus, setLogin } = require('./startup.cjs');
+const { appId, startupArg, portableExecutable, loginStatus, setLogin } = require('./startup.cjs');
 const { createSchedule } = require('./schedule.cjs');
 const { toastClsid, createReminderNotifications } = require('./reminder-notifications.cjs');
 
@@ -37,6 +37,9 @@ const hotkey = 'CommandOrControl+Alt+J';
 const icon = app.isPackaged
   ? path.join(process.resourcesPath, 'icon.png')
   : path.resolve(__dirname, '../assets/icon.png');
+const windowIcon = app.isPackaged
+  ? path.join(process.resourcesPath, 'icon.ico')
+  : path.resolve(__dirname, '../assets/icon.ico');
 let window;
 let tray;
 let quitting = false;
@@ -74,12 +77,17 @@ function signalSplash() {
 async function setupWindow() {
   window = new BrowserWindow({
     title: 'Jinkra 工具箱', width: 1300, height: 880, minWidth: 640, minHeight: 600,
-    backgroundColor: '#f4f7fc', icon, autoHideMenuBar: true, show: false,
+    backgroundColor: '#f4f7fc', icon: windowIcon, autoHideMenuBar: true, show: false,
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#fffeff', symbolColor: '#344865', height: 52 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, devTools: !app.isPackaged,
     },
+  });
+  const target = portableExecutable();
+  window.setAppDetails({
+    appId, appIconPath: target ?? windowIcon, appIconIndex: 0,
+    ...(target && { relaunchCommand: `"${target}"`, relaunchDisplayName: 'Jinkra-Toolbox' }),
   });
   let painted = false;
   const reveal = () => {

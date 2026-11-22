@@ -1,6 +1,6 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "description": "Jinkra 工具箱 · Windows 便携离线工具",
   "author": "Jinkra",
@@ -52,6 +52,10 @@
       {
         "from": "assets/icon.png",
         "to": "icon.png"
+      },
+      {
+        "from": "assets/icon.ico",
+        "to": "icon.ico"
       },
       {
         "from": "vendor/updater/jinkra-updater.exe",

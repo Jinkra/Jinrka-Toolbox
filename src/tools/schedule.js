@@ -7,6 +7,15 @@ const levels = [
 ];
 const labels = new Map(levels);
 const localDate = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short', hour12: false });
+const motionEnabled = () => document.documentElement.dataset.motion !== 'off' &&
+  !matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function animate(node, frames, duration = 180, fill = 'none') {
+  if (!motionEnabled() || !node.isConnected) return Promise.resolve();
+  return node.animate(frames, { duration, easing: 'ease-out', fill }).finished.catch(() => {});
+}
+
+const enterFrames = [{ opacity: .35, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }];
 
 function dateInput(time) {
   const date = new Date(time);
@@ -26,7 +35,8 @@ function schedulePage() {
   const history = el('div', { class: 'schedule-items' });
   const formTitle = el('h2', {}, '新建日程');
   const submit = el('button', { type: 'submit', class: 'button primary' }, '保存日程');
-  const cancel = button('取消编辑', () => reset(), 'quiet');
+  const cancel = button('取消编辑', () => { reset(); void animate(form, enterFrames); }, 'quiet');
+  const entryData = new WeakMap();
   let editing;
   let reading = 0;
 
@@ -49,11 +59,13 @@ function schedulePage() {
     at.value = dateInput(item.at > Date.now() ? item.at : Date.now() + 10 * 60_000);
     level.value = item.level;
     cancel.hidden = false;
-    title.focus();
+    title.focus({ preventScroll: true });
+    title.scrollIntoView({ block: 'nearest', behavior: motionEnabled() ? 'smooth' : 'auto' });
+    void animate(form, enterFrames);
   }
 
   function row(item) {
-    return el('article', { class: 'schedule-entry' },
+    const entry = el('article', { class: 'schedule-entry' },
       el('div', { class: 'schedule-entry-main' }, el('time', { datetime: new Date(item.at).toISOString() }, localDate.format(item.at)),
         el('h3', {}, item.title), item.notes && el('p', { class: 'schedule-note' }, item.notes),
         el('p', { class: 'hint' }, labels.get(item.level), item.deliveredAt &&
@@ -62,9 +74,46 @@ function schedulePage() {
         button('移除', task(status, async () => {
           await desktop.scheduleRemove(item.id);
           if (editing === item.id) reset();
+          entry.classList.add('schedule-leaving');
+          await animate(entry, [
+            { opacity: 1, height: `${entry.getBoundingClientRect().height}px`, marginBottom: '0px' },
+            { opacity: 0, height: '0px', marginBottom: '-12px', paddingBlock: '0px',
+              borderTopWidth: '0px', borderBottomWidth: '0px', transform: 'translateX(8px)' },
+          ], 190, 'forwards');
           await refresh();
-          status.set('已移除日程。', 'success');
+          confirmChange('已移除日程。');
         }), 'quiet')));
+    entryData.set(entry, item);
+    return entry;
+  }
+
+  function reconcile(list, items, empty) {
+    const current = new Map([...list.children].filter((node) => entryData.has(node))
+      .map((node) => [entryData.get(node).id, node]));
+    const changed = [];
+    const nodes = items.map((item) => {
+      const existing = current.get(item.id);
+      const previous = existing && entryData.get(existing);
+      if (previous && ['title', 'notes', 'at', 'level', 'deliveredAt'].every((key) => previous[key] === item[key])) return existing;
+      const next = row(item);
+      changed.push(next);
+      return next;
+    });
+    if (!nodes.length) {
+      if (list.firstChild?.textContent !== empty) list.replaceChildren(el('p', { class: 'hint' }, empty));
+      return;
+    }
+    const retained = new Set(nodes);
+    for (const node of [...list.children]) if (!retained.has(node)) node.remove();
+    for (const [index, node] of nodes.entries()) {
+      if (list.children[index] !== node) list.insertBefore(node, list.children[index] ?? null);
+    }
+    for (const node of changed) void animate(node, enterFrames);
+  }
+
+  function confirmChange(message) {
+    status.set(message, 'success');
+    void animate(status.node, enterFrames);
   }
 
   async function refresh() {
@@ -73,8 +122,8 @@ function schedulePage() {
     if (request !== reading) return;
     const future = items.filter((item) => item.deliveredAt === null).sort((a, b) => a.at - b.at);
     const past = items.filter((item) => item.deliveredAt !== null).sort((a, b) => b.deliveredAt - a.deliveredAt);
-    pending.replaceChildren(...(future.length ? future.map(row) : [el('p', { class: 'hint' }, '暂无待提醒日程。')]));
-    history.replaceChildren(...(past.length ? past.map(row) : [el('p', { class: 'hint' }, '暂无提醒记录。')]));
+    reconcile(pending, future, '暂无待提醒日程。');
+    reconcile(history, past, '暂无提醒记录。');
   }
 
   const load = task(status, async () => { await refresh(); status.set(''); }, '正在读取本地日程…');
@@ -85,7 +134,7 @@ function schedulePage() {
         at: new Date(at.value).getTime(), level: level.value });
       reset();
       await refresh();
-      status.set('日程已保存。', 'success');
+      confirmChange('日程已保存。');
     } finally { submit.disabled = false; }
   }, '正在保存日程…');
   const form = el('form', { class: 'schedule-form', onsubmit: (event) => { event.preventDefault(); void save(); } },

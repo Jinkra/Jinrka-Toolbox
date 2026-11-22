@@ -102,7 +102,7 @@ button.sidebar-version:hover { color: var(--blue); text-decoration: underline; }
 .home-hero h1 { margin: 8px 0 9px; font-size: clamp(28px, 4.3vw, 55px); letter-spacing: -.06em; line-height: 1.13; color: #172c4c; }
 .hero-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 13px; color: var(--muted); font-size: 12px; }
 .hero-facts span + span { padding-left: 12px; border-left: 1px solid #c8d6e9; }
-.home-hero-copy .button { margin-top: 15px; }
+.hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 15px; }
 .hero-portrait { position: relative; align-self: stretch; display: grid; place-items: center; }
 .hero-portrait::before { content: ""; position: absolute; z-index: -1; inset: 0;
   background: repeating-linear-gradient(90deg, #a3b9db40 0 1px, transparent 1px 22px), repeating-linear-gradient(0deg, #a3b9db40 0 1px, transparent 1px 22px);
@@ -151,7 +151,7 @@ button.sidebar-version:hover { color: var(--blue); text-decoration: underline; }
 .tone-efficiency { --chip: #faedd9; --tint: #7f4e16; }
 .tone-system { --chip: #e2eff6; --tint: #245a71; }
 .tool-card { min-width: 0; position: relative; }
-.card-open { position: relative; width: 100%; height: 100%; min-height: 122px; text-align: left; overflow: hidden; border: 0; border-radius: inherit; background: transparent; padding: 10px 11px 13px; }
+.card-open { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; width: 100%; height: 100%; min-height: 122px; text-align: left; overflow: hidden; border: 0; border-radius: inherit; background: transparent; padding: 10px 11px 13px; }
 .card-open h3 { margin: 8px 0 3px; font-size: 13px; }
 .card-open p { padding-right: 9px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .card-arrow { position: absolute; bottom: 8px; right: 8px; color: #285ba1; display: flex; opacity: 0; transform: translateX(-3px); transition: opacity .15s, transform .15s; }
@@ -261,6 +261,7 @@ progress { width: 100%; height: 7px; accent-color: #285ba1; }
 .schedule-grid { display: grid; grid-template-columns: minmax(240px, .9fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
 .schedule-form h2, .schedule-grid .surface h2 { margin: 0; font-size: 16px; }
 .schedule-entry { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; background: #f8fbff; }
+.schedule-leaving { overflow: hidden; pointer-events: none; }
 .schedule-entry-main { min-width: 0; overflow-wrap: anywhere; }
 .schedule-entry time { font: 11px var(--mono); color: var(--blue); }
 .schedule-entry h3 { margin: 4px 0; font-size: 14px; }

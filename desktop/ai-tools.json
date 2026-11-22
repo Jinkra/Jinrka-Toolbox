@@ -1,0 +1,13 @@
+[
+  { "key": "codex-desktop", "group": "desktop", "title": "Codex 桌面版", "id": "9PLM9XGG6VKS", "source": "msstore", "url": "https://learn.chatgpt.com/docs/app/windows", "description": "通过 Microsoft Store 安装 OpenAI 的 ChatGPT Windows 应用，内置 Codex。" },
+  { "key": "claude-desktop", "group": "desktop", "title": "Claude 桌面版", "id": "Anthropic.Claude", "url": "https://claude.com/download", "description": "Anthropic 的 Windows 桌面应用，登录后可使用 Claude 聊天及账户可用的功能。" },
+  { "key": "codex", "group": "cli", "title": "Codex CLI", "id": "OpenAI.Codex", "url": "https://github.com/openai/codex", "description": "终端中的 OpenAI 编程助手，安装后输入 codex 完成登录。" },
+  { "key": "claude", "group": "cli", "title": "Claude Code CLI", "id": "Anthropic.ClaudeCode", "url": "https://code.claude.com/docs/en/setup", "description": "终端中的 Claude 编程助手，安装后输入 claude 完成登录。" },
+  { "key": "deepseek", "group": "cli", "title": "DeepSeek Harness CLI", "url": "https://github.com/deepseek-ai/deepseek-harness#run", "command": "npx @deepseek-ai/dsh web", "description": "DeepSeek 官方开源工具，命令会启动本地 Web 界面。需要 Node.js 24.9 或更高版本。" },
+  { "key": "opencode", "group": "cli", "title": "OpenCode CLI", "id": "Anomaly.OpenCode", "url": "https://opencode.ai/docs/", "description": "支持多种模型提供商的开源终端编程助手。" },
+  { "key": "copilot", "group": "cli", "title": "GitHub Copilot CLI", "id": "GitHub.Copilot", "url": "https://docs.github.com/en/copilot/get-started/cli-quickstart", "description": "在终端使用 GitHub Copilot，安装后登录 GitHub。" },
+  { "key": "hermes", "group": "agent", "title": "Hermes Agent", "url": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-native", "description": "Nous Research 提供的 Agent，支持原生 Windows 安装及终端和桌面入口。" },
+  { "key": "openclaw", "group": "agent", "title": "OpenClaw", "url": "https://docs.openclaw.ai/platforms/windows", "description": "可连接消息渠道与模型的 Agent。官方 Windows Hub 提供原生安装向导。" },
+  { "key": "ccswitch", "group": "management", "title": "CC Switch", "id": "farion1231.CC-Switch", "url": "https://github.com/farion1231/cc-switch", "description": "管理多种 AI 编程工具的服务提供商、MCP 与 Skills。" },
+  { "key": "ollama", "group": "management", "title": "Ollama", "id": "Ollama.Ollama", "url": "https://ollama.com/download/windows", "description": "下载、管理和运行本地模型，可为支持 Ollama 的客户端提供模型服务。" }
+]

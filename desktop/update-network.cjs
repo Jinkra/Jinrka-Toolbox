@@ -85,13 +85,17 @@ async function readLatest(currentVersion) {
     ...lines.map(async (line) =>
       verifiedManifest(await readJson(line.prefix + releases + '/latest/download/' + manifestName, 4096))),
   ]);
-  const updates = results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
+  const [official, ...signed] = results;
+  const updates = signed.filter((result) => result.status === 'fulfilled').map((result) => result.value);
   updates.sort((a, b) => compareVersions(b.version, a.version));
   const [update] = updates;
-  if (!update || compareVersions(update.version, currentVersion) < 0) {
-    throw new Error('暂时无法确认最新版本，请稍后重试。');
+  if (update && compareVersions(update.version, currentVersion) > 0) return update;
+  if (official.status === 'fulfilled' && compareVersions(official.value.version, currentVersion) > 0) {
+    throw new Error('新版签名清单暂不可用，请稍后重试。');
   }
-  return compareVersions(update.version, currentVersion) > 0 ? update : null;
+  if ((update && compareVersions(update.version, currentVersion) === 0) ||
+      (official.status === 'fulfilled' && compareVersions(official.value.version, currentVersion) === 0)) return null;
+  throw new Error('暂时无法确认最新版本，请稍后重试。');
 }
 
 async function probe(line, url, total) {

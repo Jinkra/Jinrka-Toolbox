@@ -1,6 +1,6 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "private": true,
   "description": "Jinkra 工具箱 · Windows 便携离线工具",
   "author": "Jinkra",
@@ -56,6 +56,10 @@
       {
         "from": "vendor/updater/jinkra-updater.exe",
         "to": "jinkra-updater.exe"
+      },
+      {
+        "from": "vendor/updater/jinkra-memory.exe",
+        "to": "jinkra-memory.exe"
       }
     ],
     "portable": {

@@ -13,6 +13,7 @@ import { fileTools } from './tools/files.js';
 import { efficiencyTools } from './tools/efficiency.js';
 import { extraTools } from './tools/catalog.js';
 import { aiTools } from './tools/ai.js';
+import { systemTools } from './tools/system.js';
 
 const groups = [
   { id: 'developer', title: '开发工具', icon: 'CodeXml', tools: developerTools },
@@ -21,6 +22,7 @@ const groups = [
   { id: 'files', title: '文件工具', icon: 'Files', tools: fileTools },
   { id: 'efficiency', title: '效率工具', icon: 'Timer', tools: efficiencyTools },
   { id: 'ai', title: 'AI 工具', icon: 'Sparkles', tools: aiTools },
+  { id: 'system', title: '系统工具', icon: 'Monitor', tools: systemTools },
 ].map((group) => ({ ...group, tools: [...group.tools, ...(extraTools[group.id] ?? [])] }));
 const tools = groups.flatMap((group) => group.tools.map((tool) => ({ ...tool, group })));
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
@@ -496,7 +498,8 @@ function lock() {
   const activation = el('div', { class: 'gateway' },
     el('section', { class: 'gateway-card activation-card' },
       el('div', { class: 'gateway-brand' }, el('img', { class: 'launch-logo', src: logo, alt: '' }),
-        el('strong', {}, 'Jinkra'), el('p', { class: 'gateway-version' }, `版本号：${version}`)),
+        el('strong', { class: 'gateway-wordmark' }, el('span', {}, 'Jinkra'), el('span', {}, 'Toolbox')),
+        el('p', { class: 'gateway-version' }, `版本号：${version}`)),
       el('div', { class: 'gateway-content' }, el('h1', {}, '激活工具箱'),
         el('p', {}, '输入激活码后即可使用当前版本。'), form,
         el('div', { class: 'activation-guide' },

@@ -149,6 +149,7 @@ button.sidebar-version:hover { color: var(--blue); text-decoration: underline; }
 .tone-media { --chip: #fae6f0; --tint: #913b62; }
 .tone-files { --chip: #e2f4ee; --tint: #206753; }
 .tone-efficiency { --chip: #faedd9; --tint: #7f4e16; }
+.tone-system { --chip: #e2eff6; --tint: #245a71; }
 .tool-card { min-width: 0; position: relative; }
 .card-open { position: relative; width: 100%; height: 100%; min-height: 122px; text-align: left; overflow: hidden; border: 0; border-radius: inherit; background: transparent; padding: 10px 11px 13px; }
 .card-open h3 { margin: 8px 0 3px; font-size: 13px; }
@@ -272,6 +273,8 @@ progress { width: 100%; height: 7px; accent-color: #285ba1; }
 .gateway-card { display: grid; grid-template-columns: 170px minmax(0, 1fr); width: min(577px, 100%); min-height: 273px; overflow: hidden; border: 1px solid #cbd8ec; border-radius: 14px; background: #ffffff; box-shadow: 0 15px 48px #172f5919; }
 .gateway-brand { display: grid; align-content: center; justify-items: center; gap: 9px; padding: 16px; background: #e7effb; border-right: 1px solid var(--line); }
 .gateway-brand strong { font-size: 25px; color: #24436c; letter-spacing: -.04em; }
+.gateway-wordmark { display: grid; justify-items: center; line-height: 1.08; }
+.gateway-wordmark span + span { font-size: .82em; }
 .gateway-content { display: grid; align-content: center; gap: 11px; padding: 26px; }
 .gateway-content h1 { font-size: 25px; letter-spacing: -.03em; }
 .gateway p { color: #52627b; line-height: 1.55; }
@@ -296,6 +299,7 @@ progress { width: 100%; height: 7px; accent-color: #285ba1; }
 .skill-details { min-width: 0; overflow-wrap: anywhere; }
 .skill-details h3 { margin: 0; font-size: 13px; }
 .skill-details p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.skill-details .skill-translation { color: #50417c; font-weight: 600; }
 .skill-details code, .skill-details .skill-meta { color: #526787; font: 11px var(--mono); }
 .skill-details code { display: inline-block; margin-top: 2px; }
 .skill-row > .button, .ai-install-row .actions { flex-shrink: 0; }

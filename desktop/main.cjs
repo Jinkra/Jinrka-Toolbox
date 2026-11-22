@@ -8,7 +8,8 @@ const { convertVideo, inspectMedia } = require('./video.cjs');
 const { activate, activationState, loadActivation } = require('./activation.cjs');
 const { checkUpdate, getUpdateError, installUpdate } = require('./updater.cjs');
 const { openRepo, openToolDocs, installTool } = require('./ai.cjs');
-const { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill } = require('./skills.cjs');
+const { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill, skillDetails } = require('./skills.cjs');
+const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = require('./system.cjs');
 
 const origin = 'app://jinkra';
 const dist = path.resolve(__dirname, '../dist');
@@ -85,7 +86,8 @@ function setupWindow() {
 
 function ipc(name, handler, locked = true) {
   ipcMain.handle(`toolbox:${name}`, (event, ...args) => {
-    if (event.sender !== window.webContents || event.senderFrame?.url !== `${origin}/`) {
+    if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame ||
+        event.senderFrame.url !== `${origin}/`) {
       throw new Error('无法从此页面调用桌面功能。');
     }
     if (locked && !activationState().active) throw new Error('请先激活当前版本。');
@@ -121,16 +123,25 @@ function setupIpc(activationReady) {
     await activationReady;
     return activationState();
   }, false);
-  ipc('activation:submit', activate, false);
+  ipc('activation:submit', async (code) => {
+    await activationReady;
+    return activate(code);
+  }, false);
   ipc('creator:open', () => shell.openExternal('https://jinkra.slatt.cn/'), false);
   ipc('ai:skills', loadSkills);
   ipc('ai:skills:inspect', inspectSkills);
+  ipc('ai:skills:details', skillDetails);
   ipc('ai:skills:installed', listInstalled);
   ipc('ai:skills:install', installSkill);
   ipc('ai:skills:uninstall', uninstallSkill);
   ipc('ai:repo', openRepo);
   ipc('ai:tool-docs', openToolDocs);
   ipc('ai:install', installTool);
+  ipc('system:info', systemInfo);
+  ipc('system:trim-memory', trimMemory);
+  ipc('system:scan-cleanup', scanCleanup);
+  ipc('system:clean-scan', (id) => cleanScan(window, id));
+  ipc('system:storage-settings', openStorageSettings);
   ipc('update:check', checkUpdate);
   ipc('update:error', getUpdateError);
   ipc('update:install', () => installUpdate((progress) => window.webContents.send('toolbox:update:progress', progress)));

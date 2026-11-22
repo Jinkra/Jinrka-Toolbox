@@ -5,11 +5,7 @@ const { promisify } = require('node:util');
 const { validRepo } = require('./skills.cjs');
 
 const run = promisify(execFile);
-const tools = Object.freeze({
-  codex: { id: 'OpenAI.Codex', url: 'https://github.com/openai/codex' },
-  claude: { id: 'Anthropic.ClaudeCode', url: 'https://code.claude.com/docs/en/setup' },
-  ccswitch: { id: 'farion1231.CC-Switch', url: 'https://github.com/farion1231/cc-switch' },
-});
+const tools = new Map(require('./ai-tools.json').map((tool) => [tool.key, tool]));
 
 let installing = false;
 
@@ -22,8 +18,9 @@ function openRepo(name, folder) {
 }
 
 function getTool(key) {
-  if (typeof key !== 'string' || !Object.hasOwn(tools, key)) throw new Error('不支持此安装项。');
-  return tools[key];
+  const tool = tools.get(key);
+  if (!tool) throw new Error('不支持此安装项。');
+  return tool;
 }
 
 function openToolDocs(key) {
@@ -31,13 +28,14 @@ function openToolDocs(key) {
 }
 
 async function installTool(key) {
-  const { id } = getTool(key);
+  const { id, source = 'winget' } = getTool(key);
+  if (!id) throw new Error('请使用此工具的官方安装入口。');
   if (installing) throw new Error('已有工具正在安装。');
   if (!process.env.LOCALAPPDATA) throw new Error('找不到 WinGet。请从 Microsoft Store 安装或更新「应用安装程序」。');
   const executable = path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WindowsApps', 'winget.exe');
   installing = true;
   try {
-    await run(executable, ['install', '--id', id, '--exact', '--source', 'winget', '--silent',
+    await run(executable, ['install', '--id', id, '--exact', '--source', source, ...(source === 'winget' ? ['--silent'] : []),
       '--accept-source-agreements', '--accept-package-agreements', '--disable-interactivity'], { windowsHide: true });
     return { alreadyCurrent: false };
   } catch (error) {

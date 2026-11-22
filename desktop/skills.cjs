@@ -3,6 +3,7 @@ const { createHash } = require('node:crypto');
 const { readFile, writeFile, lstat, mkdir, mkdtemp, readdir, rename, rm } = require('node:fs/promises');
 const path = require('node:path');
 const { validateName, withOutput } = require('./files.cjs');
+const { translateSkill } = require('./skill-translation.cjs');
 
 const catalogRepo = 'anbeime/skill';
 const repositoryPattern = /^[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9_.-]{1,100}$/i;
@@ -13,6 +14,7 @@ const cacheDuration = 30 * 60_000;
 const inspected = new Map();
 let refreshing;
 let mutating = false;
+let currentCatalog;
 
 function bundledSnapshot() {
   return require('./skills-seed.json');
@@ -30,9 +32,9 @@ function raw(repo, ref, file) {
   return `https://raw.githubusercontent.com/${repo}/${ref}/${file.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-async function fetchGitHub(url, limit = 4 * 1024 * 1024) {
+async function fetchGitHub(url, limit = 4 * 1024 * 1024, timeout = 20_000) {
   const response = await fetch(url, {
-    redirect: 'error', signal: AbortSignal.timeout(20_000),
+    redirect: 'error', signal: AbortSignal.timeout(timeout),
     headers: { 'User-Agent': 'Jinkra-Toolbox' },
   });
   if (!response.ok) {
@@ -99,9 +101,9 @@ function repoEntries(sources, trending) {
 
 async function loadSkills(force) {
   const filename = path.join(app.getPath('userData'), 'ai-catalog.json');
-  const saved = await readFile(filename, 'utf8').then(JSON.parse).catch(() => null);
+  const saved = currentCatalog ?? await readFile(filename, 'utf8').then(JSON.parse).catch(() => null);
   if (refreshing) return refreshing;
-  if (saved && Date.now() - saved.fetchedAt < (force === true ? 8_000 : cacheDuration)) return saved;
+  if (saved && Date.now() - saved.fetchedAt < (force === true ? 8_000 : cacheDuration)) return currentCatalog = saved;
   refreshing = (async () => {
     const requests = await Promise.allSettled([
       repositoryTree(catalogRepo), json(raw(catalogRepo, 'main', 'SKILL_SOURCES.json')),
@@ -121,6 +123,7 @@ async function loadSkills(force) {
     };
     rememberTree(catalogRepo, available);
     if (!offline) await withOutput(filename, (file) => writeFile(file, JSON.stringify(result))).catch(() => {});
+    currentCatalog = result;
     return result;
   })().finally(() => { refreshing = undefined; });
   return refreshing;
@@ -145,6 +148,36 @@ async function snapshotFor(repo) {
 
 async function inspectSkills(repo) {
   return skillPaths((await snapshotFor(repo)).tree);
+}
+
+function skillDescription(contents) {
+  const header = contents.replace(/^\uFEFF/, '').match(/^---\r?\n([\s\S]*?)\r?\n---\s*\r?\n/u)?.[1];
+  const description = header?.match(/(?:^|\n)description:[ \t]*([^\r\n]*)([\s\S]*?)(?=\r?\n[^\s]|$)/u);
+  if (!description) return '';
+  const lines = /^[>|][+-]?$/u.test(description[1].trim()) ? '' : description[1];
+  return shortText((lines + description[2]).trim().replace(/\s+/g, ' ').replace(/^(['"])(.*)\1$/u, '$2'));
+}
+
+async function skillDetails(repo, folder) {
+  if (!validRepo(repo)) throw new Error('GitHub 仓库名称无效。');
+  if (folder === null) {
+    const { repos } = await loadSkills(false);
+    const entry = repos.find((item) => item.repo === repo);
+    if (!entry) return {};
+    const chinese = await translateSkill(repo.split('/')[1].replace(/[-_]/g, ' '), entry.description);
+    return { chinese };
+  }
+  if (typeof folder !== 'string' || folder.length > 650) return {};
+  const saved = inspected.get(repo.toLowerCase());
+  const { ref, tree } = saved?.snapshot ?? (repo.toLowerCase() === catalogRepo ? bundledSnapshot() : {});
+  const file = folder ? folder + '/SKILL.md' : 'SKILL.md';
+  const manifest = tree?.find((item) => item.path === file && item.type === 'blob' && regularModes.has(item.mode));
+  if (!manifest || !objectId.test(ref) || manifest.size > 128 * 1024) return {};
+  const name = folder.split('/').pop() || repo.split('/')[1];
+  const contents = await fetchGitHub(raw(repo, ref, file), 128 * 1024, 6000).catch(() => null);
+  const description = contents ? skillDescription(contents.toString('utf8')) : '';
+  const chinese = await translateSkill(name.replace(/[-_]/g, ' '), description);
+  return { description, chinese };
 }
 
 function locations() {
@@ -259,4 +292,4 @@ async function uninstallSkill(agent, name) {
   });
 }
 
-module.exports = { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill, validRepo };
+module.exports = { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill, validRepo, skillDetails };

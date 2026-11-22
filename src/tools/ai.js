@@ -1,43 +1,54 @@
-import { actions, box, button, el, icon, makeStatus, task } from '../ui.js';
-
+import { actions, box, button, copy, el, icon, makeStatus, task } from '../ui.js';
+import packages from '../../desktop/ai-tools.json';
 import { skillLibrary } from './skills.js';
 
-const packages = [
-  { key: 'codex', title: 'Codex CLI', id: 'OpenAI.Codex', description: '在终端运行 Codex。安装后打开终端输入 codex 完成登录。' },
-  { key: 'claude', title: 'Claude Code CLI', id: 'Anthropic.ClaudeCode', description: '在终端运行 Claude Code。安装后打开终端输入 claude 完成登录。' },
-  { key: 'ccswitch', title: 'CC Switch', id: 'farion1231.CC-Switch', description: '管理多种 AI 编程工具的服务提供商、MCP 与 Skills。' },
+const groups = [
+  ['desktop', '桌面应用', 'Grid2X2'],
+  ['cli', 'CLI 工具', 'Terminal'],
+  ['agent', 'Agent 工具', 'Sparkles'],
+  ['management', '管理工具', 'Settings2'],
 ];
 
 function installers() {
   const status = makeStatus();
   const installButtons = [];
-  const list = packages.map((item) => {
-    const install = button('一键安装', task(status, async () => {
-      for (const control of installButtons) control.disabled = true;
-      try {
-        const result = await desktop.aiInstall(item.key);
-        status.set(result.alreadyCurrent ? `${item.title} 已是最新可用版本。` : `${item.title} 安装完成。`, 'success');
-      } finally {
-        for (const control of installButtons) control.disabled = false;
-      }
-    }, `正在通过 WinGet 安装 ${item.title}…`), 'primary', 'Download');
-    install.disabled = !globalThis.desktop;
-    install.setAttribute('aria-label', `安装 ${item.title}`);
-    installButtons.push(install);
-    return el('article', { class: 'ai-install-row' },
-      el('span', { class: 'tool-icon tone-ai' }, icon(item.key === 'ccswitch' ? 'Settings2' : 'Terminal', 20)),
-      el('div', { class: 'skill-details' }, el('h3', {}, item.title), el('p', {}, item.description), el('code', {}, item.id)),
-      actions(install, globalThis.desktop && button('安装来源', task(status, async () => {
-        await desktop.aiToolDocs(item.key);
+  const sections = groups.map(([group, title, symbol]) => el('section', { class: 'ai-section' }, el('h2', {}, title),
+    el('div', { class: 'skill-list' }, packages.filter((item) => item.group === group).map((item) => {
+      const docs = button(item.id ? '安装来源' : '官方安装指南', task(status, async () => {
+        if (globalThis.desktop) await desktop.aiToolDocs(item.key);
+        else window.open(item.url, '_blank', 'noopener,noreferrer');
         status.set('');
-      }), 'quiet', 'ExternalLink')),
-    );
-  });
-  return box(el('p', { class: 'hint' }, '点击安装后，WinGet 会下载对应工具并接受软件包和源协议。安装需要联网。'),
-    status.node, el('div', { class: 'skill-list' }, list));
+      }), item.id ? 'quiet' : 'secondary', 'ExternalLink');
+      const command = item.command && button('复制命令', task(status, async () => {
+        await copy(item.command);
+        status.set('命令已复制。', 'success');
+      }), 'quiet', 'Copy');
+      const install = item.id && button('一键安装', task(status, async () => {
+        for (const control of installButtons) control.disabled = true;
+        try {
+          const result = await desktop.aiInstall(item.key);
+          status.set(result.alreadyCurrent ? `${item.title} 已是最新可用版本。` : `${item.title} 安装完成。`, 'success');
+        } finally {
+          for (const control of installButtons) control.disabled = false;
+        }
+      }, `正在安装 ${item.title}…`), 'primary', 'Download');
+      if (install) {
+        install.disabled = !globalThis.desktop;
+        install.setAttribute('aria-label', `安装 ${item.title}`);
+        installButtons.push(install);
+      }
+      return el('article', { class: 'ai-install-row' },
+        el('span', { class: 'tool-icon tone-ai' }, icon(symbol, 20)),
+        el('div', { class: 'skill-details' }, el('h3', {}, item.title), el('p', {}, item.description),
+          (item.command || item.id) && el('code', {}, item.command || item.id)),
+        actions(install, command, docs));
+    })),
+  ));
+  return box(el('p', { class: 'hint' }, '一键安装会联网，并通过 WinGet 或 Microsoft Store 接受软件包和源协议。'),
+    status.node, sections);
 }
 
 export const aiTools = [
-  { id: 'ai-skills', name: 'AI Skill 库', icon: 'Sparkles', description: '同步 GitHub Skill 目录，一键安装与卸载本地技能。', keywords: '技能 skill skills github', render: skillLibrary },
-  { id: 'ai-install', name: 'AI 工具安装', icon: 'Download', description: '一键安装 Codex CLI、Claude Code CLI 和 CC Switch。', keywords: 'codex claude ccswitch cc switch winget 部署', render: installers },
+  { id: 'ai-skills', name: 'AI Skill 库', icon: 'Sparkles', description: '同步 GitHub Skill 目录，显示原文和中文译文，管理本地技能。', keywords: '技能 skill skills github', render: skillLibrary },
+  { id: 'ai-install', name: 'AI 工具安装', icon: 'Download', description: '安装桌面应用、CLI、Agent 和管理工具。', keywords: 'codex claude ccswitch deepseek hermes openclaw opencode copilot ollama 部署', render: installers },
 ];

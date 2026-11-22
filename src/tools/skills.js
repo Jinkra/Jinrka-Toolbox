@@ -24,6 +24,61 @@ export function skillLibrary() {
   let shown = pageSize;
   let pendingSync = false;
   let busy = false;
+  const captions = new Map();
+  const ongoing = new Map();
+  const observed = new WeakMap();
+  const queue = [];
+  let active = 0;
+  const observer = new IntersectionObserver((entries) => {
+    for (const { target, isIntersecting } of entries) {
+      if (!isIntersecting) continue;
+      observer.unobserve(target);
+      queue.push(target);
+    }
+    translateVisible();
+  }, { rootMargin: '160px' });
+
+  const captionKey = (repo, folder) => repo + ':' + (folder ?? '@');
+
+  function showCaption(node, detail) {
+    const original = node.querySelector('.skill-original');
+    const translation = node.querySelector('.skill-translation');
+    if (detail.description && !original.textContent) {
+      original.textContent = detail.description;
+      original.hidden = false;
+    }
+    if (detail.chinese) {
+      translation.textContent = detail.chinese;
+      translation.hidden = false;
+    }
+  }
+
+  function translateVisible() {
+    while (active < 4 && queue.length) {
+      const node = queue.shift();
+      if (!node.isConnected) continue;
+      const { key, repo, folder } = observed.get(node);
+      if (captions.has(key)) { showCaption(node, captions.get(key)); continue; }
+      if (!ongoing.has(key)) {
+        ongoing.set(key, desktop.aiSkillDetails(repo, folder).finally(() => ongoing.delete(key)));
+      }
+      active++;
+      void ongoing.get(key).then((detail) => {
+        if (detail.chinese || detail.description) captions.set(key, detail);
+        if (node.isConnected) showCaption(node, detail);
+      }).catch(() => {}).finally(() => { active--; translateVisible(); });
+    }
+  }
+
+  function bilingual(node, repo, folder) {
+    const key = captionKey(repo, folder);
+    if (captions.has(key)) showCaption(node, captions.get(key));
+    else {
+      observed.set(node, { key, repo, folder });
+      observer.observe(node);
+    }
+    return node;
+  }
 
   function source(repo, folder) {
     const suffix = folder ? '/tree/HEAD/' + folder.split('/').map(encodeURIComponent).join('/') : '';
@@ -41,7 +96,8 @@ export function skillLibrary() {
 
   function row(title, description, details, controls) {
     return el('article', { class: 'skill-row' }, el('div', { class: 'skill-details' },
-      el('h3', {}, title), description && el('p', {}, description),
+      el('h3', {}, title), el('p', { class: 'skill-original', hidden: !description }, description),
+      el('p', { class: 'skill-translation', lang: 'zh-CN', hidden: true }),
       details && el('p', { class: 'skill-meta' }, details)), actions(...controls));
   }
 
@@ -63,7 +119,7 @@ export function skillLibrary() {
     }, '正在下载 ' + name + '…'), 'primary', exists ? 'Check' : 'Download');
     install.disabled = busy || exists;
     install.setAttribute('aria-label', (exists ? '已安装 ' : '安装 ') + name);
-    return row(name, null, folder || repo, [source(repo, folder), install]);
+    return bilingual(row(name, null, folder || repo, [source(repo, folder), install]), repo, folder);
   }
 
   function repoRow(item) {
@@ -80,7 +136,7 @@ export function skillLibrary() {
       }
     }, '正在读取 ' + item.repo + '…'), 'secondary', 'ChevronRight');
     inspect.disabled = busy;
-    return row(item.repo, item.description, item.updated?.slice(0, 10), [source(item.repo), inspect]);
+    return bilingual(row(item.repo, item.description, item.updated?.slice(0, 10), [source(item.repo), inspect]), item.repo, null);
   }
 
   function localRow(item) {
@@ -102,6 +158,8 @@ export function skillLibrary() {
   }
 
   function draw() {
+    observer.disconnect();
+    queue.length = 0;
     for (const [key, tab] of tabs) {
       tab.setAttribute('aria-pressed', String(view === key));
       tab.textContent = views[key] + (key === 'local' ? ' ' + local.length : '');
@@ -118,11 +176,15 @@ export function skillLibrary() {
       empty = '没有检测到已安装的 Skill。';
     } else if (view === 'bundled' || currentRepo) {
       const repo = currentRepo?.repo ?? catalog;
-      match = (currentRepo ? repoSkills : catalogData?.bundled ?? []).filter((folder) => (folder || repo).toLowerCase().includes(term));
+      match = (currentRepo ? repoSkills : catalogData?.bundled ?? []).filter((folder) => {
+        const detail = captions.get(captionKey(repo, folder));
+        return [folder || repo, detail?.description, detail?.chinese].join(' ').toLowerCase().includes(term);
+      });
       render = (folder) => onlineRow(repo, folder);
       empty = pendingSync ? '正在读取合集技能…' : '暂无可显示的 Skill。';
     } else {
-      match = (catalogData?.repos ?? []).filter((item) => (item.repo + ' ' + item.description).toLowerCase().includes(term));
+      match = (catalogData?.repos ?? []).filter((item) =>
+        [item.repo, item.description, captions.get(captionKey(item.repo, null))?.chinese].join(' ').toLowerCase().includes(term));
       render = repoRow;
       empty = pendingSync ? '正在读取 GitHub 目录…' : '暂无可显示的仓库。';
     }
@@ -182,7 +244,7 @@ export function skillLibrary() {
 
   return box(el('section', { class: 'ai-section' },
     el('div', { class: 'skill-toolbar' }, el('div', { class: 'skill-details' }, el('h2', {}, 'anbeime/skill'),
-      el('p', {}, '同步合集和 GitHub 收录，查看来源后安装到所选平台。')),
+      el('p', {}, '同步公开 Skill，联网时在原文下方显示中文译文。')),
       actions(source(catalog), refreshButton)),
     syncStatus.node,
     el('div', { class: 'skill-toolbar' }, el('div', { class: 'skill-tabs', role: 'group', 'aria-label': 'Skill 目录' }, ...tabs.values()),

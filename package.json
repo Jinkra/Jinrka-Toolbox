@@ -1,6 +1,6 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "description": "Jinkra 工具箱 · Windows 便携离线工具",
   "author": "Jinkra",
@@ -15,7 +15,7 @@
     "start": "electron .",
     "desktop": "npm run build && npm start",
     "predist": "node scripts/prepare-ffmpeg.mjs && node scripts/prepare-updater.mjs",
-    "dist": "npm run build && electron-builder --win portable --x64 --publish never"
+    "dist": "npm run build && node scripts/build-portable.cjs"
   },
   "build": {
     "appId": "com.jinkra.toolbox",
@@ -59,7 +59,6 @@
       }
     ],
     "portable": {
-      "splashImage": "assets/startup.bmp",
       "useZip": true
     },
     "win": {

@@ -3,7 +3,7 @@ import {
   Check, ChevronRight, CircleHelp, Clipboard, CodeXml, Copy, FileCheck, FilePenLine,
   Files, FileText, Fingerprint, Grid2X2, Hash, Image, KeyRound, Link2, LockKeyhole,
   NotebookPen, Palette, Pin, QrCode, Regex, Search, Settings2, ShieldCheck, Shuffle, Star,
-  Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3,
+  Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3, Sparkles, Download, RefreshCw, ExternalLink,
 } from 'lucide';
 
 const icons = {
@@ -11,7 +11,7 @@ const icons = {
   Check, ChevronRight, CircleHelp, Clipboard, CodeXml, Copy, FileCheck, FilePenLine,
   Files, FileText, Fingerprint, Grid2X2, Hash, Image, KeyRound, Link2, LockKeyhole,
   NotebookPen, Palette, Pin, QrCode, Regex, Search, Settings2, ShieldCheck, Shuffle, Star,
-  Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3,
+  Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3, Sparkles, Download, RefreshCw, ExternalLink,
 };
 
 export function el(tag, attributes = {}, ...children) {

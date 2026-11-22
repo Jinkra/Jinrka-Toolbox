@@ -231,4 +231,4 @@ async function applyRenames(files, settings) {
   return moved.length;
 }
 
-module.exports = { createZip, extractZip, hashFiles, planRenames, applyRenames, withOutput };
+module.exports = { createZip, extractZip, hashFiles, planRenames, applyRenames, validateName, withOutput };

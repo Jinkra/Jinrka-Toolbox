@@ -11,6 +11,7 @@ import { mediaTools } from './tools/media.js';
 import { fileTools } from './tools/files.js';
 import { efficiencyTools } from './tools/efficiency.js';
 import { extraTools } from './tools/catalog.js';
+import { aiTools } from './tools/ai.js';
 
 const groups = [
   { id: 'developer', title: '开发工具', icon: 'CodeXml', tools: developerTools },
@@ -18,6 +19,7 @@ const groups = [
   { id: 'media', title: '媒体工具', icon: 'Image', tools: mediaTools },
   { id: 'files', title: '文件工具', icon: 'Files', tools: fileTools },
   { id: 'efficiency', title: '效率工具', icon: 'Timer', tools: efficiencyTools },
+  { id: 'ai', title: 'AI 工具', icon: 'Sparkles', tools: aiTools },
 ].map((group) => ({ ...group, tools: [...group.tools, ...(extraTools[group.id] ?? [])] }));
 const tools = groups.flatMap((group) => group.tools.map((tool) => ({ ...tool, group })));
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
@@ -438,14 +440,30 @@ function openUpdate(known, message = '') {
   }
 }
 
+function reveal(next) {
+  const previous = frame.querySelector('.gateway:not(.gateway-leaving)');
+  next.hidden = false;
+  if (!preferences.motion || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    previous?.remove();
+    return;
+  }
+  const options = { duration: 240, easing: 'ease-in-out', fill: 'both' };
+  void next.animate([{ opacity: 0 }, { opacity: 1 }], options).finished.catch(() => {});
+  if (previous) {
+    previous.classList.add('gateway-leaving');
+    previous.inert = true;
+    void previous.animate([{ opacity: 1 }, { opacity: 0 }], options).finished
+      .catch(() => {}).finally(() => previous.remove());
+  }
+}
+
 function enter() {
-  frame.querySelector('.gateway')?.remove();
   state.ready = true;
   applyPreferences();
   topControls.hidden = false;
-  workspace.hidden = false;
   syncSearch();
   render();
+  reveal(workspace);
   if (globalThis.desktop) void desktop.windowState().then((desktopState) => {
     state.pinned = desktopState.pinned;
     state.shortcut = desktopState.shortcutRegistered;
@@ -472,13 +490,15 @@ function lock() {
     }
   }, '正在验证…');
   form.addEventListener('submit', (event) => { event.preventDefault(); void activate(event); });
-  frame.querySelector('.gateway').replaceWith(el('div', { class: 'gateway page-enter' },
+  const activation = el('div', { class: 'gateway' },
     el('section', { class: 'gateway-card' },
       el('div', { class: 'gateway-brand' }, el('img', { class: 'launch-logo', src: logo, alt: '' }),
         el('strong', {}, 'Jinkra'), el('p', { class: 'gateway-version' }, `版本号：${version}`)),
       el('div', { class: 'gateway-content' }, el('h1', {}, '激活工具箱'),
         el('p', {}, '输入激活码后即可使用当前版本。'), form,
-        el('p', { class: 'activation-link' }, '获取激活码请前往：', creatorLink('jinkra.slatt.cn'))))));
+        el('p', { class: 'activation-link' }, '获取激活码请前往：', creatorLink('jinkra.slatt.cn')))));
+  reveal(activation);
+  frame.append(activation);
   code.focus();
 }
 

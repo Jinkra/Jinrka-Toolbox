@@ -7,6 +7,8 @@ const { createZip, extractZip, hashFiles, planRenames, applyRenames, withOutput 
 const { convertVideo, inspectMedia } = require('./video.cjs');
 const { activate, activationState, loadActivation } = require('./activation.cjs');
 const { checkUpdate, getUpdateError, installUpdate } = require('./updater.cjs');
+const { openRepo, openToolDocs, installTool } = require('./ai.cjs');
+const { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill } = require('./skills.cjs');
 
 const origin = 'app://jinkra';
 const dist = path.resolve(__dirname, '../dist');
@@ -44,6 +46,13 @@ function showWindow() {
   window.focus();
 }
 
+function signalSplash() {
+  const file = process.env.JINKRA_SPLASH_SIGNAL;
+  if (file && path.isAbsolute(file) && path.basename(file) === 'jinkra-splash.ready') {
+    void writeFile(file, '', { flag: 'wx' }).catch(() => {});
+  }
+}
+
 function setupWindow() {
   window = new BrowserWindow({
     title: 'Jinkra 工具箱', width: 1300, height: 880, minWidth: 640, minHeight: 600,
@@ -54,7 +63,10 @@ function setupWindow() {
       contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, devTools: !app.isPackaged,
     },
   });
-  window.once('ready-to-show', showWindow);
+  window.once('ready-to-show', () => {
+    showWindow();
+    signalSplash();
+  });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
@@ -111,6 +123,14 @@ function setupIpc(activationReady) {
   }, false);
   ipc('activation:submit', activate, false);
   ipc('creator:open', () => shell.openExternal('https://jinkra.slatt.cn/'), false);
+  ipc('ai:skills', loadSkills);
+  ipc('ai:skills:inspect', inspectSkills);
+  ipc('ai:skills:installed', listInstalled);
+  ipc('ai:skills:install', installSkill);
+  ipc('ai:skills:uninstall', uninstallSkill);
+  ipc('ai:repo', openRepo);
+  ipc('ai:tool-docs', openToolDocs);
+  ipc('ai:install', installTool);
   ipc('update:check', checkUpdate);
   ipc('update:error', getUpdateError);
   ipc('update:install', () => installUpdate((progress) => window.webContents.send('toolbox:update:progress', progress)));
@@ -197,6 +217,7 @@ function setupIpc(activationReady) {
 }
 
 if (!app.requestSingleInstanceLock()) {
+  signalSplash();
   app.quit();
 } else {
   app.on('second-instance', () => { if (window) showWindow(); });
@@ -236,6 +257,7 @@ if (!app.requestSingleInstanceLock()) {
     tray.on('double-click', showWindow);
     shortcutRegistered = globalShortcut.register(hotkey, showWindow);
   }).catch((error) => {
+    signalSplash();
     dialog.showErrorBox('无法启动 Jinkra 工具箱', error.message);
     app.quit();
   });

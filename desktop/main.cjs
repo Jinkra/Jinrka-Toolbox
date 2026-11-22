@@ -14,9 +14,10 @@ const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = 
 const { runtimeStatus, inspectDll, installRuntime, runtimeDocs } = require('./runtime.cjs');
 const { arrowStatus, changeArrow, openSystemCheck } = require('./windows-maintenance.cjs');
 const { checkApi } = require('./ai-connection.cjs');
-const { appId, startupArg, portableExecutable, loginStatus, setLogin } = require('./startup.cjs');
+const { startupArg, portableExecutable, loginStatus, setLogin } = require('./startup.cjs');
 const { createSchedule } = require('./schedule.cjs');
-const { toastClsid, createReminderNotifications } = require('./reminder-notifications.cjs');
+const { createReminderNotifications } = require('./reminder-notifications.cjs');
+const { shellAppId, brandName, prepareWindowsBrand } = require('./windows-brand.cjs');
 
 const origin = 'app://jinkra';
 const dist = path.resolve(__dirname, '../dist');
@@ -53,10 +54,11 @@ let renameInProgress = false;
 let videoJob;
 let showOnReady = !process.argv.includes(startupArg);
 let dashboardReady = false;
+const registerBrand = prepareWindowsBrand(icon);
 const notify = createReminderNotifications(() => window, () => {
   showWindow();
   window.webContents.send('toolbox:schedule:open');
-}, icon);
+}, icon, registerBrand);
 const schedule = createSchedule((item) => {
   void notify(item).catch((error) => console.error('日程通知', error.message));
 }, () => {
@@ -90,8 +92,8 @@ async function setupWindow() {
   });
   const target = portableExecutable();
   window.setAppDetails({
-    appId, appIconPath: target ?? windowIcon, appIconIndex: 0,
-    ...(target && { relaunchCommand: `"${target}"`, relaunchDisplayName: 'Jinkra-Toolbox' }),
+    appId: shellAppId, appIconPath: target ?? windowIcon, appIconIndex: 0,
+    ...(target && { relaunchCommand: `"${target}"`, relaunchDisplayName: brandName }),
   });
   let painted = false;
   const reveal = () => {
@@ -338,8 +340,8 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
     Menu.setApplicationMenu(null);
-    app.setAppUserModelId(appId);
-    app.setToastActivatorCLSID(toastClsid);
+    // Resolve the Windows attribution in parallel with the dashboard startup.
+    void registerBrand();
     const activationReady = loadActivation();
     setupIpc(activationReady);
     if (!await setupWindow()) return;

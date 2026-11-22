@@ -1,41 +1,12 @@
-const { app, BrowserWindow, dialog, Notification, screen, shell } = require('electron');
-const { mkdir, unlink } = require('node:fs/promises');
-const path = require('node:path');
-const { appId, portableExecutable } = require('./startup.cjs');
+const { BrowserWindow, dialog, nativeImage, Notification, screen, shell } = require('electron');
+const { brandName: reminderTitle } = require('./windows-brand.cjs');
 
-const toastClsid = '{FDD365C6-1AC9-4DA9-8512-5E06D6789004}';
-const reminderTitle = 'Jinkra-Toolbox';
 const escape = (text) => text.replace(/[&<>]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[character]);
 
-function createReminderNotifications(getWindow, openSchedule, icon) {
+function createReminderNotifications(getWindow, openSchedule, icon, registerBrand) {
   const active = new Set();
   const corners = new Set();
   let prompts = Promise.resolve();
-  let registered;
-
-  async function registerToast() {
-    const target = portableExecutable();
-    if (!target) return true;
-    const folder = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
-    const shortcut = path.join(folder, reminderTitle + '.lnk');
-    const legacy = path.join(folder, 'Jinkra 工具箱.lnk');
-    await mkdir(folder, { recursive: true });
-    let existing;
-    try { existing = shell.readShortcutLink(shortcut); } catch {}
-    if (existing?.target === target && existing.appUserModelId === appId && existing.toastActivatorClsid === toastClsid) return true;
-    const written = shell.writeShortcutLink(shortcut, {
-      target, cwd: path.dirname(target), icon: target, iconIndex: 0, appUserModelId: appId, toastActivatorClsid: toastClsid,
-      description: '打开 Jinkra 工具箱',
-    });
-    if (written) {
-      try {
-        const previous = shell.readShortcutLink(legacy);
-        if (previous.appUserModelId === appId && previous.toastActivatorClsid === toastClsid &&
-            previous.description === '打开 Jinkra 工具箱') await unlink(legacy);
-      } catch {}
-    }
-    return written;
-  }
 
   function corner(item, body) {
     const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -50,9 +21,10 @@ function createReminderNotifications(getWindow, openSchedule, icon) {
     });
     corners.add(notice);
     notice.once('closed', () => corners.delete(notice));
-    const contents = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>${reminderTitle}</title><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>
-      body{margin:20px;font:14px 'Microsoft YaHei UI',sans-serif;background:#f4f7fc;color:#172c4c;overflow-wrap:anywhere}h1{font-size:17px;margin:0 0 8px}p{margin:0;white-space:pre-wrap;line-height:1.5}</style>
-      <h1>${escape(item.title)}</h1><p>${escape(body)}</p></html>`;
+    const logo = nativeImage.createFromPath(icon).resize({ width: 48 }).toDataURL();
+    const contents = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>${reminderTitle}</title><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>
+      body{display:flex;gap:12px;margin:20px;font:14px 'Microsoft YaHei UI',sans-serif;background:#f4f7fc;color:#172c4c;overflow-wrap:anywhere}h1{font-size:17px;margin:0 0 8px}p{margin:0;white-space:pre-wrap;line-height:1.5}</style>
+      <img src="${logo}" width="48" height="48" alt=""><div><h1>${escape(item.title)}</h1><p>${escape(body)}</p></div></html>`;
     void notice.loadURL('data:text/html;base64,' + Buffer.from(contents).toString('base64')).then(() => {
       if (notice.isDestroyed()) return;
       notice.showInactive();
@@ -76,9 +48,7 @@ function createReminderNotifications(getWindow, openSchedule, icon) {
       return;
     }
     try {
-      if (!Notification.isSupported()) { corner(item, body); return; }
-      registered ??= registerToast().catch(() => false);
-      if (!await registered) { registered = undefined; corner(item, body); return; }
+      if (!Notification.isSupported() || !await registerBrand()) { corner(item, body); return; }
       const persistent = item.level === 'persistent';
       const notice = new Notification({
         title: reminderTitle, body: [item.title, body].join('\n'), icon, timeoutType: persistent ? 'never' : 'default',
@@ -96,4 +66,4 @@ function createReminderNotifications(getWindow, openSchedule, icon) {
   };
 }
 
-module.exports = { toastClsid, createReminderNotifications };
+module.exports = { createReminderNotifications };

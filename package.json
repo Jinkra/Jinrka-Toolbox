@@ -1,6 +1,6 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "private": true,
   "description": "Jinkra 工具箱 · Windows 离线工具",
   "author": "Jinkra",
@@ -70,9 +70,10 @@
       "oneClick": true,
       "perMachine": false,
       "runAfterFinish": false,
-      "createDesktopShortcut": false,
+      "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Jinkra-Toolbox"
+      "shortcutName": "Jinkra-Toolbox",
+      "include": "scripts/installer-shortcuts.nsh"
     },
     "win": {
       "icon": "assets/icon.ico",

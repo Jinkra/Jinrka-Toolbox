@@ -11,6 +11,9 @@ const { checkUpdate, getUpdateError, installUpdate } = require('./updater.cjs');
 const { openRepo, openToolDocs, installTool } = require('./ai.cjs');
 const { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill, skillDetails } = require('./skills.cjs');
 const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = require('./system.cjs');
+const { runtimeStatus, inspectDll, installRuntime, runtimeDocs } = require('./runtime.cjs');
+const { arrowStatus, changeArrow, openSystemCheck } = require('./windows-maintenance.cjs');
+const { checkApi } = require('./ai-connection.cjs');
 const { appId, startupArg, portableExecutable, loginStatus, setLogin } = require('./startup.cjs');
 const { createSchedule } = require('./schedule.cjs');
 const { toastClsid, createReminderNotifications } = require('./reminder-notifications.cjs');
@@ -27,6 +30,7 @@ const fileFilters = {
   any: [],
   directory: [],
   zip: [{ name: 'ZIP 归档', extensions: ['zip'] }],
+  executable: [{ name: 'Windows 程序', extensions: ['exe'] }],
   video: [{ name: '视频', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v', 'flv', 'wmv', 'ogv', 'mpg', 'mpeg', 'ts', 'm2ts', '3gp'] }],
   audio: [{ name: '音频', extensions: ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'wma', 'mp4', 'webm'] }],
   image: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif', 'bmp', 'svg', 'ico', 'heic', 'heif', 'tif', 'tiff'] }],
@@ -196,11 +200,20 @@ function setupIpc(activationReady) {
   ipc('ai:repo', openRepo);
   ipc('ai:tool-docs', openToolDocs);
   ipc('ai:install', installTool);
+  ipc('ai:check-api', checkApi);
   ipc('system:info', systemInfo);
   ipc('system:trim-memory', trimMemory);
   ipc('system:scan-cleanup', scanCleanup);
   ipc('system:clean-scan', (id) => cleanScan(window, id));
   ipc('system:storage-settings', openStorageSettings);
+  ipc('system:runtime-status', runtimeStatus);
+  ipc('system:inspect-dll', (selection, text, arch) => inspectDll(
+    selection ? getPaths(selection, 'executable')[0] : null, text, arch));
+  ipc('system:install-runtime', installRuntime);
+  ipc('system:runtime-docs', runtimeDocs);
+  ipc('system:arrow-status', arrowStatus);
+  ipc('system:change-arrow', changeArrow);
+  ipc('system:sfc', openSystemCheck);
   ipc('schedule:list', schedule.list);
   ipc('schedule:save', schedule.save);
   ipc('schedule:remove', schedule.remove);

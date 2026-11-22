@@ -1,4 +1,5 @@
 import { actions, box, button, el, field, makeStatus, readableSize, select, task } from '../ui.js';
+import { maintenanceTools } from './maintenance.js';
 
 const size = (bytes) => bytes >= 2 ** 30 ? `${(bytes / 2 ** 30).toFixed(2)} GiB` : readableSize(bytes);
 const metric = (label, value) => el('div', {}, el('dt', {}, label), el('dd', {}, value));
@@ -98,4 +99,5 @@ export const systemTools = [
   { id: 'system-memory', name: '内存释放', icon: 'MemoryStick', description: '查看物理内存并整理当前会话进程的工作集。', keywords: 'RAM 内存清理 PCL2', render: memoryTool },
   { id: 'system-cleanup', name: '系统盘清理', icon: 'HardDrive', description: '扫描并清理旧临时文件和 DirectX 缓存。', keywords: 'C盘 垃圾清理 存储', render: diskCleanup },
   { id: 'system-overview', name: '系统信息', icon: 'Monitor', description: '查看 Windows、CPU、内存和系统盘容量。', keywords: 'Windows CPU 磁盘 硬件', render: systemOverview },
+  ...maintenanceTools,
 ];

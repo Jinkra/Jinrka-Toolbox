@@ -1,6 +1,7 @@
 import { actions, box, button, copy, el, icon, makeStatus, task } from '../ui.js';
 import packages from '../../desktop/ai-tools.json';
 import { skillLibrary } from './skills.js';
+import { aiHelpers } from './ai-helpers.js';
 
 const groups = [
   ['desktop', '桌面应用', 'Grid2X2'],
@@ -51,4 +52,5 @@ function installers() {
 export const aiTools = [
   { id: 'ai-skills', name: 'AI Skill 库', icon: 'Sparkles', description: '同步 GitHub Skill 目录，显示原文和中文译文，管理本地技能。', keywords: '技能 skill skills github', render: skillLibrary },
   { id: 'ai-install', name: 'AI 工具安装', icon: 'Download', description: '安装桌面应用、CLI、Agent 和管理工具。', keywords: 'codex claude ccswitch deepseek hermes openclaw opencode copilot ollama 部署', render: installers },
+  ...aiHelpers,
 ];

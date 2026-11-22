@@ -11,6 +11,7 @@ import { textTools } from './tools/text.js';
 import { mediaTools } from './tools/media.js';
 import { fileTools } from './tools/files.js';
 import { efficiencyTools } from './tools/efficiency.js';
+import { agenda } from './tools/schedule.js';
 import { extraTools } from './tools/catalog.js';
 import { aiTools } from './tools/ai.js';
 import { systemTools } from './tools/system.js';
@@ -20,7 +21,7 @@ const groups = [
   { id: 'text', title: '文本工具', icon: 'AlignLeft', tools: textTools },
   { id: 'media', title: '媒体工具', icon: 'Image', tools: mediaTools },
   { id: 'files', title: '文件工具', icon: 'Files', tools: fileTools },
-  { id: 'efficiency', title: '效率工具', icon: 'Timer', tools: efficiencyTools },
+  { id: 'efficiency', title: '效率工具', icon: 'Timer', tools: [agenda, ...efficiencyTools] },
   { id: 'ai', title: 'AI 工具', icon: 'Sparkles', tools: aiTools },
   { id: 'system', title: '系统工具', icon: 'Monitor', tools: systemTools },
 ].map((group) => ({ ...group, tools: [...group.tools, ...(extraTools[group.id] ?? [])] }));
@@ -316,6 +317,23 @@ function openSettings() {
   density.value = preferences.density;
   const [motionLabel, motion] = check('播放启动和切换动画', preferences.motion);
   const [autoLabel, auto] = check('启动后自动检查更新', preferences.autoCheck);
+  const [loginLabel, login] = check('开机自启', false);
+  const loginStatus = makeStatus();
+  login.disabled = true;
+  const setLogin = task(loginStatus, async () => {
+    const enabled = login.checked;
+    login.disabled = true;
+    try {
+      const result = await desktop.windowSetLogin(enabled);
+      login.checked = result.enabled;
+      loginStatus.set(result.enabled ? 'Windows 登录后自动进入托盘。' : '开机自启已关闭。', 'success');
+    } catch (error) {
+      const current = await desktop.windowLoginStatus().catch(() => ({ enabled: !enabled }));
+      login.checked = current.enabled;
+      throw error;
+    } finally { login.disabled = false; }
+  }, '正在更新 Windows 启动设置…');
+  login.addEventListener('change', setLogin);
   const close = select([['tray', '收起到系统托盘'], ['quit', '直接退出软件']]);
   close.value = preferences.close;
   const set = (key, value) => {
@@ -333,12 +351,18 @@ function openSettings() {
     el('div', { class: 'dialog-title' }, el('h2', {}, '设置'), iconButton('X', '关闭设置', () => settingsDialog.close())),
     preferencesGroup('界面与工具', el('div', { class: 'settings-fields' }, field('默认工具模式', mode), field('布局密度', density)), motionLabel),
     globalThis.desktop && preferencesGroup('桌面行为', field('关闭窗口时', close),
+      loginLabel, loginStatus.node,
       button('查看快捷方式', () => { settingsDialog.close(); openAbout(); }, 'quiet', 'CircleHelp')),
     globalThis.desktop && preferencesGroup('软件更新',
       el('div', { class: 'settings-update' }, el('p', { class: 'hint' }, `当前版本 ${version}`),
         button('检查更新', () => { settingsDialog.close(); openUpdate(false); }, 'secondary', 'ArrowDownUp')), autoLabel),
   );
   settingsDialog.showModal();
+  if (globalThis.desktop) void desktop.windowLoginStatus().then(({ available, enabled }) => {
+    login.disabled = !available;
+    login.checked = enabled;
+    loginStatus.set(available ? '' : '从便携 EXE 启动后可以设置开机自启。');
+  }).catch(() => loginStatus.set('无法读取 Windows 启动设置。', 'error'));
 }
 
 search.addEventListener('input', () => setQuery(search.value));
@@ -478,6 +502,13 @@ function enter() {
     void desktop.updateError().then((message) => { if (message) openUpdate(false, message); }).catch(() => {});
     if (preferences.autoCheck) void desktop.checkUpdate().then(showUpdateResult).catch(() => {});
   }
+}
+
+if (globalThis.desktop) {
+  desktop.onScheduleChange(() => content.querySelector('.schedule-tool')?.dispatchEvent(new Event('schedule-changed')));
+  desktop.onOpenSchedule(() => {
+    if (state.ready && state.tool?.id !== agenda.id) openTool(byId.get(agenda.id));
+  });
 }
 
 function lock() {

@@ -1,8 +1,9 @@
-const { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, net, protocol, shell, Tray } = require('electron');
+const { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, net, powerMonitor, protocol, shell, Tray } = require('electron');
 const { randomUUID } = require('node:crypto');
-const { stat, writeFile } = require('node:fs/promises');
+const { readFile, stat, writeFile } = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { setTimeout: delay } = require('node:timers/promises');
 const { createZip, extractZip, hashFiles, planRenames, applyRenames, withOutput } = require('./files.cjs');
 const { convertVideo, inspectMedia } = require('./video.cjs');
 const { activate, activationState, loadActivation } = require('./activation.cjs');
@@ -10,6 +11,9 @@ const { checkUpdate, getUpdateError, installUpdate } = require('./updater.cjs');
 const { openRepo, openToolDocs, installTool } = require('./ai.cjs');
 const { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill, skillDetails } = require('./skills.cjs');
 const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = require('./system.cjs');
+const { appId, startupArg, loginStatus, setLogin } = require('./startup.cjs');
+const { createSchedule } = require('./schedule.cjs');
+const { toastClsid, createReminderNotifications } = require('./reminder-notifications.cjs');
 
 const origin = 'app://jinkra';
 const dist = path.resolve(__dirname, '../dist');
@@ -40,8 +44,21 @@ let closeBehavior = 'tray';
 let shortcutRegistered = false;
 let renameInProgress = false;
 let videoJob;
+let showOnReady = !process.argv.includes(startupArg);
+let dashboardReady = false;
+const notify = createReminderNotifications(() => window, () => {
+  showWindow();
+  window.webContents.send('toolbox:schedule:open');
+}, icon);
+const schedule = createSchedule((item) => {
+  void notify(item).catch((error) => console.error('日程通知', error.message));
+}, () => {
+  if (window && !window.isDestroyed()) window.webContents.send('toolbox:schedule:changed');
+});
 
 function showWindow() {
+  showOnReady = true;
+  if (!dashboardReady || !window || window.isDestroyed()) return;
   if (window.isMinimized()) window.restore();
   window.show();
   window.focus();
@@ -54,7 +71,7 @@ function signalSplash() {
   }
 }
 
-function setupWindow() {
+async function setupWindow() {
   window = new BrowserWindow({
     title: 'Jinkra 工具箱', width: 1300, height: 880, minWidth: 640, minHeight: 600,
     backgroundColor: '#f4f7fc', icon, autoHideMenuBar: true, show: false,
@@ -64,10 +81,13 @@ function setupWindow() {
       contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, devTools: !app.isPackaged,
     },
   });
-  window.once('ready-to-show', () => {
-    showWindow();
+  let painted = false;
+  const reveal = () => {
+    if (!painted || !dashboardReady) return;
+    if (showOnReady) showWindow();
     signalSplash();
-  });
+  };
+  window.once('ready-to-show', () => { painted = true; reveal(); });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
@@ -81,7 +101,36 @@ function setupWindow() {
       window.hide();
     }
   });
-  return window.loadURL(`${origin}/`);
+  dashboardReady = await loadDashboard();
+  reveal();
+  return dashboardReady;
+}
+
+async function loadDashboard() {
+  const log = path.join(app.getPath('userData'), 'startup-error.log');
+  for (;;) {
+    const failures = [];
+    for (const pause of [0, 250, 750]) {
+      if (pause) await delay(pause);
+      if (quitting || window.isDestroyed()) return false;
+      try {
+        await stat(path.join(dist, 'index.html'));
+        await window.loadURL(`${origin}/`);
+        return true;
+      } catch (error) {
+        failures.push(`${new Date().toISOString()} ${error.message}`);
+        await writeFile(log, failures.join('\n') + '\n', 'utf8').catch(() => {});
+      }
+    }
+    if (quitting || window.isDestroyed()) return false;
+    signalSplash();
+    const choice = await dialog.showMessageBox({
+      type: 'error', title: 'Jinkra 工具箱', message: '启动页面暂时无法加载。',
+      detail: `已尝试重新加载。排查日志保存在 ${log}`,
+      buttons: ['重试', '退出'], defaultId: 0, cancelId: 1, noLink: true,
+    });
+    if (choice.response !== 0) { app.quit(); return false; }
+  }
 }
 
 function ipc(name, handler, locked = true) {
@@ -125,7 +174,9 @@ function setupIpc(activationReady) {
   }, false);
   ipc('activation:submit', async (code) => {
     await activationReady;
-    return activate(code);
+    const result = await activate(code);
+    schedule.start();
+    return result;
   }, false);
   ipc('creator:open', () => shell.openExternal('https://jinkra.slatt.cn/'), false);
   ipc('ai:skills', loadSkills);
@@ -142,6 +193,10 @@ function setupIpc(activationReady) {
   ipc('system:scan-cleanup', scanCleanup);
   ipc('system:clean-scan', (id) => cleanScan(window, id));
   ipc('system:storage-settings', openStorageSettings);
+  ipc('schedule:list', schedule.list);
+  ipc('schedule:save', schedule.save);
+  ipc('schedule:remove', schedule.remove);
+  ipc('schedule:test', schedule.test);
   ipc('update:check', checkUpdate);
   ipc('update:error', getUpdateError);
   ipc('update:install', () => installUpdate((progress) => window.webContents.send('toolbox:update:progress', progress)));
@@ -225,14 +280,16 @@ function setupIpc(activationReady) {
     return window.isAlwaysOnTop();
   });
   ipc('window:hide', () => window.hide());
+  ipc('window:login-status', loginStatus);
+  ipc('window:set-login', setLogin);
 }
 
 if (!app.requestSingleInstanceLock()) {
   signalSplash();
   app.quit();
 } else {
-  app.on('second-instance', () => { if (window) showWindow(); });
-  app.on('before-quit', () => { quitting = true; });
+  app.on('second-instance', (_event, args) => { if (!args.includes(startupArg)) showWindow(); });
+  app.on('before-quit', () => { quitting = true; schedule.stop(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   app.whenReady().then(async () => {
     protocol.handle('app', async (request) => {
@@ -241,14 +298,18 @@ if (!app.requestSingleInstanceLock()) {
       try {
         const relative = decodeURIComponent(address.pathname.slice(1)) || 'index.html';
         const input = relative.match(/^selected\/([a-f0-9-]{36})\/(\d+)$/u);
-        let file;
         if (input) {
           const chosen = selections.get(input[1]);
+          let file;
           if (activationState().active && inputKinds.has(chosen?.kind)) file = chosen.paths[Number(input[2])];
           if (!file || !(await stat(file)).isFile()) return new Response(null, { status: 404 });
-        } else {
-          file = path.resolve(dist, relative);
-          if (!file.startsWith(dist + path.sep)) return new Response(null, { status: 404 });
+          return await net.fetch(pathToFileURL(file).href, { bypassCustomProtocolHandlers: true });
+        }
+        const file = path.resolve(dist, relative);
+        if (!file.startsWith(dist + path.sep)) return new Response(null, { status: 404 });
+        if (relative === 'index.html') {
+          const html = await readFile(file);
+          return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         }
         return await net.fetch(pathToFileURL(file).href, { bypassCustomProtocolHandlers: true });
       } catch {
@@ -256,9 +317,11 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
     Menu.setApplicationMenu(null);
-    app.setAppUserModelId('com.jinkra.toolbox');
-    setupIpc(loadActivation());
-    await setupWindow();
+    app.setAppUserModelId(appId);
+    app.setToastActivatorCLSID(toastClsid);
+    const activationReady = loadActivation();
+    setupIpc(activationReady);
+    if (!await setupWindow()) return;
     tray = new Tray(icon);
     tray.setToolTip('Jinkra 工具箱');
     tray.setContextMenu(Menu.buildFromTemplate([
@@ -267,6 +330,9 @@ if (!app.requestSingleInstanceLock()) {
     ]));
     tray.on('double-click', showWindow);
     shortcutRegistered = globalShortcut.register(hotkey, showWindow);
+    await activationReady;
+    if (activationState().active) schedule.start();
+    powerMonitor.on('resume', schedule.wake);
   }).catch((error) => {
     signalSplash();
     dialog.showErrorBox('无法启动 Jinkra 工具箱', error.message);

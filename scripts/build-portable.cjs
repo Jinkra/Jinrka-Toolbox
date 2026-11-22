@@ -41,15 +41,19 @@ async function build() {
   }
   const splash = String.raw`
   InitPluginsDir
+  @ARGS@ $R1 0
+  StrCmp $R1 "jinkra-autostart" jinkra_skip_splash
   SetOutPath "$PLUGINSDIR"
   File /oname=jinkra-splash.exe "@HELPER@"
   System::Call 'kernel32::GetCurrentProcessId() i .r1'
   System::Call 'kernel32::SetEnvironmentVariable(t, t)i ("JINKRA_SPLASH_SIGNAL", "$PLUGINSDIR\jinkra-splash.ready").r0'
-  Exec '"$PLUGINSDIR\jinkra-splash.exe" "$1" "$PLUGINSDIR\jinkra-splash.ready"'`;
+  Exec '"$PLUGINSDIR\jinkra-splash.exe" "$1" "$PLUGINSDIR\jinkra-splash.ready"'
+  jinkra_skip_splash:`;
   // The bundled template defaults to one shared extraction directory per build.
   // Keep $PLUGINSDIR\app so each launcher owns its running files and cleanup.
   writeFileSync(script, template.replace(sharedDirectory + '\n', '').replace(beforeExtract, (line) =>
-    line.replace('\nFunctionEnd', () => splash.replace('@HELPER@', () => helper) + '\nFunctionEnd')));
+    line.replace('\nFunctionEnd', () => splash.replace('@HELPER@', () => helper)
+      .replace('@ARGS@', '${StdUtils.GetAllParameters}') + '\nFunctionEnd')));
   nsis.nsisTemplatesDir = templates;
   const { build: bundle, Platform, Arch } = require('electron-builder');
   const electronDist = process.env.JINKRA_ELECTRON_DIST;

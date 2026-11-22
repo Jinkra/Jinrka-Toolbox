@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -17,6 +18,7 @@ internal sealed class ToolboxSetup : Form {
     private const int BrandWidth = 258;
     private const string ProductExe = "Jinkra 工具箱.exe";
     private const string Uninstaller = "Uninstall Jinkra 工具箱.exe";
+    private const string ShortcutName = "Jinkra-Toolbox.lnk";
     private const string InstallKey = @"Software\Jinkra\Toolbox";
     private static readonly Color Ink = Color.FromArgb(23, 44, 76);
     private static readonly Color Blue = Color.FromArgb(43, 91, 167);
@@ -346,6 +348,21 @@ internal sealed class ToolboxSetup : Form {
     }
 
     private static void Install(string directory, IProgress<int> progress, bool desktop, bool quick, bool update) {
+        var shortcuts = new Dictionary<string, byte[]>();
+        string desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), ShortcutName);
+        string quickLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            @"Microsoft\Internet Explorer\Quick Launch", ShortcutName);
+        string target = Path.Combine(directory, ProductExe);
+        if (update) {
+            foreach (string shortcut in new[] { desktopLink, quickLink }) {
+                if (File.Exists(shortcut)) shortcuts.Add(shortcut, File.ReadAllBytes(shortcut));
+            }
+            desktop = shortcuts.ContainsKey(desktopLink);
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(InstallKey)) {
+                quick = shortcuts.ContainsKey(quickLink) && key != null &&
+                    String.Equals(key.GetValue("QuickLaunchTarget") as string, target, StringComparison.OrdinalIgnoreCase);
+            }
+        }
         string work = Path.Combine(Path.GetTempPath(), "jinkra-setup-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         string payload = Path.Combine(work, "package.exe");
@@ -376,9 +393,19 @@ internal sealed class ToolboxSetup : Form {
                     throw new IOException("安装未完成。请关闭正在运行的工具箱并检查目录权限。");
                 }
             }
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(InstallKey)) key.SetValue("InstallLocation", directory);
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(InstallKey)) {
+                key.SetValue("InstallLocation", directory);
+                if (update && quick) key.SetValue("QuickLaunchTarget", target);
+            }
         } finally {
             try { File.Delete(payload); Directory.Delete(work); } catch (IOException) {} catch (UnauthorizedAccessException) {}
+            foreach (var shortcut in shortcuts) {
+                // Some NSIS upgrades remove an older shortcut even when its target is unchanged.
+                if (File.Exists(shortcut.Key)) continue;
+                using (var link = new FileStream(shortcut.Key, FileMode.CreateNew, FileAccess.Write)) {
+                    link.Write(shortcut.Value, 0, shortcut.Value.Length);
+                }
+            }
         }
     }
 

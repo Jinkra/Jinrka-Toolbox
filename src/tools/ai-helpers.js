@@ -110,7 +110,7 @@ function contextTool() {
 }
 
 function apiTool() {
-  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 便携版中使用 API 测试。'));
+  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 安装版中使用 API 测试。'));
   const status = makeStatus();
   const address = input({ type: 'url', placeholder: 'https://example.com/v1 或 http://127.0.0.1:11434/v1', maxlength: 1500 });
   const key = input({ type: 'password', maxlength: 4096, autocomplete: 'off', placeholder: '本地服务可留空' });

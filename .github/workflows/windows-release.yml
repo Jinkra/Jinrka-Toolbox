@@ -1,4 +1,4 @@
-name: Windows 便携版发布
+name: Windows 安装版发布
 
 on:
   push:
@@ -38,24 +38,32 @@ jobs:
         run: |
           $version = node -p "require('./package.json').version"
           if ($env:RELEASE_TAG -ne "v$version") { throw '版本标签与 package.json 不一致。' }
-      - name: 构建便携 EXE
+      - name: 构建 Windows 安装包
         shell: pwsh
         run: |
           npm ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run dist
-      - name: 签名更新清单
+      - name: 生成发布备注
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = gh api --method POST "repos/$env:GITHUB_REPOSITORY/releases/generate-notes" -f "tag_name=$env:RELEASE_TAG" --jq .body
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $notes | Set-Content -LiteralPath 'release/jinkra-release-notes.md' -Encoding utf8
+      - name: 签名更新清单和发布备注
         shell: pwsh
         env:
           JINKRA_UPDATE_SIGNING_KEY: ${{ secrets.JINKRA_UPDATE_SIGNING_KEY }}
-        run: node scripts/sign-release.cjs
+        run: node scripts/sign-release.cjs 'release/jinkra-release-notes.md'
       - name: 发布到 GitHub Releases
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = node -p "require('./package.json').version"
-          $name = "Jinkra-Toolbox-$version-x64.exe"
+          $name = "Jinkra-Toolbox-Setup-$version-x64.exe"
           $exe = Join-Path 'release' $name
           $sha = "$exe.sha256"
-          gh release create $env:RELEASE_TAG $exe $sha 'release/jinkra-update.json' --verify-tag --title "Jinkra 工具箱 $version" --generate-notes
+          gh release create $env:RELEASE_TAG $exe $sha 'release/jinkra-install-update.json' 'release/jinkra-release-notes.json' --verify-tag --title "Jinkra 工具箱 $version" --notes-file 'release/jinkra-release-notes.md'

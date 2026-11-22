@@ -4,13 +4,13 @@
 
 ## 运行
 
-从 [GitHub Releases](https://github.com/Jinkra/Jinrka-Toolbox/releases/latest) 获取便携 EXE，双击即可打开。启动时会把内置组件解压到 Windows 临时目录。首次打开每个版本需要输入激活码，激活记录保存在本机。程序未做数字签名。
+从 [GitHub Releases](https://github.com/Jinkra/Jinrka-Toolbox/releases/latest) 获取 Windows x64 安装包，选择目录并完成安装，然后从开始菜单打开工具箱。从旧便携版迁移时，请先运行一次安装包。首次打开每个版本需要输入激活码，激活记录保存在本机。程序未做数字签名。
 
-微信搜索「都拓文化」或扫描激活页二维码，关注公众号获取激活码。程序默认在启动后检查最新发行版。右上角设置提供手动检查更新、默认工具模式、布局密度、动画及窗口关闭行为。更新支持 GitHub 直连和加速线路，下载前测速，失败时自动切换。校验发布清单签名和完整文件的 SHA-256 后替换当前便携 EXE 并重新启动。见[激活与发布保护](docs/activation-security.md)。
+微信搜索「都拓文化」或扫描激活页二维码，关注公众号获取激活码。程序默认在启动后检查最新发行版。右上角设置提供手动检查更新、默认工具模式、布局密度、动画及窗口关闭行为。检查和下载支持 GitHub 直连及加速线路。更新弹窗显示发布备注，下载前测速，失败时自动切换。校验发布清单签名和完整文件的 SHA-256 后，在原安装目录更新并重新启动。见[激活与发布保护](docs/activation-security.md)。
 
 `Ctrl + K` 搜索工具。`Ctrl + Alt + J` 从其他应用唤出窗口。默认使用简单版，右上角可切换到专业版并保留当前输入。点击图钉可切换置顶。关闭窗口会收起到系统托盘，退出应用请用托盘菜单。
 
-设置里的「开机自启」会在 Windows 登录后从原始便携 EXE 启动并进入托盘。移动 EXE 后，可用新位置启动并重新打开此开关。
+设置里的「开机自启」会在 Windows 登录后启动已安装的工具箱并进入托盘。
 
 ## 工具范围
 
@@ -42,8 +42,8 @@ npm run desktop
 npm run dist
 ```
 
-首次从源码运行或构建会联网获取 Electron 和 FFmpeg。生成的便携 EXE 在 `release/`。只开发界面时可用 `npm run dev`，文件系统和窗口功能需在桌面应用中使用。
+首次从源码运行或构建会联网获取 Electron 和 FFmpeg。生成的 Windows 安装包在 `release/`。只开发界面时可用 `npm run dev`，文件系统和窗口功能需在桌面应用中使用。
 
-推送与项目版本相同的 `vX.Y.Z` 标签后，GitHub Actions 会用仓库的 `JINKRA_UPDATE_SIGNING_KEY` 密钥签名更新清单，并发布便携 EXE、清单及 SHA-256 校验文件。
+推送与项目版本相同的 `vX.Y.Z` 标签后，GitHub Actions 会用仓库的 `JINKRA_UPDATE_SIGNING_KEY` 密钥签名更新清单和发布备注，并发布 Windows 安装包及 SHA-256 校验文件。
 
 参考项目、FFmpeg 源码和许可信息见 [THIRD-PARTY.md](THIRD-PARTY.md)。

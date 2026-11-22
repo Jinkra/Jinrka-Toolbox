@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('desktop', {
   onScheduleChange: (callback) => { ipcRenderer.on('toolbox:schedule:changed', () => callback()); },
   onOpenSchedule: (callback) => { ipcRenderer.on('toolbox:schedule:open', () => callback()); },
   checkUpdate: invoke('update:check'),
+  updateNotes: invoke('update:notes'),
   updateError: invoke('update:error'),
   installUpdate: invoke('update:install'),
   onUpdateProgress: (callback) => {

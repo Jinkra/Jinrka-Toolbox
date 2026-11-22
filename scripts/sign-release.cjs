@@ -1,16 +1,17 @@
 const { createHash, createPrivateKey, sign } = require('node:crypto');
 const { createReadStream } = require('node:fs');
-const { writeFile } = require('node:fs/promises');
+const { readFile, writeFile } = require('node:fs/promises');
 const path = require('node:path');
 const { version } = require('../package.json');
-const { manifestName, manifestMessage, verifiedManifest } = require('../desktop/update-manifest.cjs');
+const { manifestName, manifestMessage, verifiedManifest, releaseFilename,
+  notesName, notesLimit, notesMessage, verifiedNotes } = require('../desktop/update-manifest.cjs');
 
 async function createReleaseFiles() {
   const encoded = process.env.JINKRA_UPDATE_SIGNING_KEY;
   if (!encoded) throw new Error('缺少发布签名密钥。');
   const key = createPrivateKey({ key: Buffer.from(encoded, 'base64'), format: 'der', type: 'pkcs8' });
   const directory = path.resolve(__dirname, '../release');
-  const filename = `Jinkra-Toolbox-${version}-x64.exe`;
+  const filename = releaseFilename(version);
   const hash = createHash('sha256');
   let size = 0;
   for await (const bytes of createReadStream(path.join(directory, filename))) {
@@ -20,10 +21,19 @@ async function createReleaseFiles() {
   const manifest = { version, size, sha256: hash.digest('hex') };
   manifest.signature = sign(null, manifestMessage(manifest), key).toString('base64');
   verifiedManifest(manifest);
-  await Promise.all([
+  const notesPath = process.argv[2];
+  const outputs = [
     writeFile(path.join(directory, filename + '.sha256'), manifest.sha256 + '  ' + filename + '\n'),
     writeFile(path.join(directory, manifestName), JSON.stringify(manifest) + '\n'),
-  ]);
+  ];
+  if (notesPath) {
+    const notes = (await readFile(notesPath, 'utf8')).trim().slice(0, notesLimit);
+    const release = { version, notes };
+    release.signature = sign(null, notesMessage(release), key).toString('base64');
+    verifiedNotes(release, version);
+    outputs.push(writeFile(path.join(directory, notesName), JSON.stringify(release) + '\n'));
+  }
+  await Promise.all(outputs);
 }
 
 createReleaseFiles().catch((error) => {

@@ -3,16 +3,17 @@ const { createWriteStream } = require('node:fs');
 const { rm } = require('node:fs/promises');
 const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
-const { manifestName, validUpdate, verifiedManifest } = require('./update-manifest.cjs');
+const { manifestName, validUpdate, verifiedManifest, releaseFilename, notesName, notesLimit, verifiedNotes } = require('./update-manifest.cjs');
 
 const repo = 'Jinkra/Jinrka-Toolbox';
 const releases = 'https://github.com/' + repo + '/releases';
+const releaseApi = 'https://api.github.com/repos/' + repo + '/releases';
 const lines = [
   { name: 'GitHub 直连', prefix: '' },
   { name: 'GHFast', prefix: 'https://ghfast.top/' },
   { name: 'GH-Proxy', prefix: 'https://gh-proxy.org/' },
   { name: 'GH-Proxy CDN', prefix: 'https://cdn.gh-proxy.org/' },
-  { name: 'GHProxy.net', prefix: 'https://ghproxy.net/' },
+  { name: 'Dpik 加速', prefix: 'https://gh.dpik.top/' },
 ];
 const officialHosts = ['github.com', 'api.github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'];
 const hosts = new Set([
@@ -23,8 +24,6 @@ const redirects = new Set([301, 302, 303, 307, 308]);
 const probeBytes = 128 * 1024;
 const surveyTimeout = 7000;
 const stalledTimeout = 15_000;
-
-const filename = (version) => `Jinkra-Toolbox-${version}-x64.exe`;
 
 function compareVersions(a, b) {
   const right = b.split('.').map(Number);
@@ -55,7 +54,7 @@ async function request(url, signal, headers = {}, official = false) {
 
 async function readJson(url, limit, official = false) {
   const response = await request(url, AbortSignal.timeout(surveyTimeout), { Accept: 'application/json' }, official);
-  if (!response.ok || !response.body) {
+  if (!response.ok || !response.body || Number(response.headers.get('content-length')) > limit) {
     await response.body?.cancel();
     throw new Error('更新信息暂不可用。');
   }
@@ -70,13 +69,28 @@ async function readJson(url, limit, official = false) {
 }
 
 async function officialRelease() {
-  const release = await readJson(`https://api.github.com/repos/${repo}/releases/latest`, 256 * 1024, true);
+  const release = await readJson(releaseApi + '/latest', 256 * 1024, true);
   const version = typeof release?.tag_name === 'string' && release.tag_name.startsWith('v') ? release.tag_name.slice(1) : '';
-  const asset = Array.isArray(release?.assets) && release.assets.find((item) => item?.name === filename(version));
+  const asset = Array.isArray(release?.assets) && release.assets.find((item) => item?.name === releaseFilename(version));
   const sha256 = typeof asset?.digest === 'string' && asset.digest.startsWith('sha256:') ? asset.digest.slice(7) : '';
   const result = { version, size: asset?.size, sha256 };
   if (release?.draft || release?.prerelease || !validUpdate(result)) throw new Error('GitHub 正式发行包暂不可用。');
   return result;
+}
+
+async function readReleaseNotes(version) {
+  return Promise.any([
+    readJson(releaseApi + '/tags/v' + version, 256 * 1024, true).then((release) => {
+      if (release?.tag_name !== 'v' + version || typeof release?.body !== 'string' || !release.body.trim()) {
+        throw new Error('GitHub 未提供发布备注。');
+      }
+      return release.body.slice(0, notesLimit);
+    }),
+    ...lines.map(async ({ prefix }) => {
+      const notes = await readJson(`${prefix}${releases}/download/v${version}/${notesName}`, notesLimit * 6 + 1024);
+      return verifiedNotes(notes, version);
+    }),
+  ]).catch(() => '');
 }
 
 async function readLatest(currentVersion) {
@@ -88,11 +102,18 @@ async function readLatest(currentVersion) {
   const [official, ...signed] = results;
   const updates = signed.filter((result) => result.status === 'fulfilled').map((result) => result.value);
   updates.sort((a, b) => compareVersions(b.version, a.version));
-  const [update] = updates;
-  if (update && compareVersions(update.version, currentVersion) > 0) return update;
-  if (official.status === 'fulfilled' && compareVersions(official.value.version, currentVersion) > 0) {
-    throw new Error('新版签名清单暂不可用，请稍后重试。');
+  let [update] = updates;
+  if (official.status === 'fulfilled' && compareVersions(official.value.version, currentVersion) > 0 &&
+      (!update || compareVersions(official.value.version, update.version) > 0)) {
+    // Some accelerators cache /latest even after the new versioned assets are available.
+    const { version } = official.value;
+    update = await Promise.any(lines.map(async (line) => {
+      const manifest = verifiedManifest(await readJson(`${line.prefix}${releases}/download/v${version}/${manifestName}`, 4096));
+      if (manifest.version !== version) throw new Error('更新清单版本不符。');
+      return manifest;
+    })).catch(() => { throw new Error('新版签名清单暂不可用，请稍后重试。'); });
   }
+  if (update && compareVersions(update.version, currentVersion) > 0) return update;
   if ((update && compareVersions(update.version, currentVersion) === 0) ||
       (official.status === 'fulfilled' && compareVersions(official.value.version, currentVersion) === 0)) return null;
   throw new Error('暂时无法确认最新版本，请稍后重试。');
@@ -125,7 +146,7 @@ async function probe(line, url, total) {
 async function receive(line, url, update, staged, report) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), stalledTimeout);
-  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(900_000)]);
+  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(2_700_000)]);
   const total = update.size;
   try {
     const response = await request(line.prefix + url, signal);
@@ -166,7 +187,7 @@ async function receive(line, url, update, staged, report) {
 }
 
 async function download(update, staged, report) {
-  const url = `${releases}/download/v${update.version}/${filename(update.version)}`;
+  const url = `${releases}/download/v${update.version}/${releaseFilename(update.version)}`;
   report({ stage: 'probe', received: 0, total: update.size, speed: 0 });
   const tests = await Promise.all(lines.map(async (line) => ({
     line, speed: await probe(line, url, update.size).catch(() => 0),
@@ -186,4 +207,4 @@ async function download(update, staged, report) {
   throw new Error('所有更新线路均未完成下载或校验，请稍后重试。');
 }
 
-module.exports = { readLatest, download };
+module.exports = { readLatest, readReleaseNotes, download };

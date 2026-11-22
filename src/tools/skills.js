@@ -232,7 +232,7 @@ export function skillLibrary() {
       : state[catalogData.state] + ' · ' + new Date(catalogData.fetchedAt).toLocaleString('zh-CN'));
   }
 
-  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 便携版中同步及管理 Skill。'), source(catalog));
+  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 安装版中同步及管理 Skill。'), source(catalog));
   for (const key of Object.keys(views)) tabs.set(key, button(views[key], () => setView(key), 'quiet'));
   search.addEventListener('input', () => { shown = pageSize; draw(); });
   agent.addEventListener('change', draw);

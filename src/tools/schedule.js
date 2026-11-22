@@ -23,7 +23,7 @@ function dateInput(time) {
 }
 
 function schedulePage() {
-  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 便携版中使用日程提醒。'));
+  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 安装版中使用日程提醒。'));
   const status = makeStatus();
   const title = input({ required: true, maxlength: 90, placeholder: '例如：提交周报' });
   const notes = area('准备事项或补充说明');

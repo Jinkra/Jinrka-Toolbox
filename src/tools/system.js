@@ -5,7 +5,7 @@ const size = (bytes) => bytes >= 2 ** 30 ? `${(bytes / 2 ** 30).toFixed(2)} GiB`
 const metric = (label, value) => el('div', {}, el('dt', {}, label), el('dd', {}, value));
 
 function memoryTool() {
-  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 便携版中使用内存释放。'));
+  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 安装版中使用内存释放。'));
   const status = makeStatus();
   const results = el('dl', { class: 'metrics' });
   const progress = el('progress', { max: 100, hidden: true, 'aria-label': '物理内存占用率' });
@@ -34,7 +34,7 @@ function memoryTool() {
 }
 
 function diskCleanup() {
-  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 便携版中使用系统盘清理。'));
+  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 安装版中使用系统盘清理。'));
   const status = makeStatus();
   const report = el('dl', { class: 'metrics' });
   const keep = select([[3, '3 天'], [7, '7 天'], [14, '14 天'], [30, '30 天']]);
@@ -79,7 +79,7 @@ function diskCleanup() {
 }
 
 function systemOverview() {
-  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 便携版中查看系统信息。'));
+  if (!globalThis.desktop) return box(el('p', { class: 'hint' }, '请在 Windows 安装版中查看系统信息。'));
   const status = makeStatus();
   const list = el('dl', { class: 'metrics' });
   const refresh = task(status, async () => {

@@ -7,17 +7,17 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { createZip, extractZip, hashFiles, planRenames, applyRenames, withOutput } = require('./files.cjs');
 const { convertVideo, inspectMedia } = require('./video.cjs');
 const { activate, activationState, loadActivation } = require('./activation.cjs');
-const { checkUpdate, getUpdateError, installUpdate } = require('./updater.cjs');
+const { checkUpdate, getReleaseNotes, getUpdateError, installUpdate, cleanCompletedUpdate } = require('./updater.cjs');
 const { openRepo, openToolDocs, installTool } = require('./ai.cjs');
 const { loadSkills, inspectSkills, listInstalled, installSkill, uninstallSkill, skillDetails } = require('./skills.cjs');
 const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = require('./system.cjs');
 const { runtimeStatus, inspectDll, installRuntime, runtimeDocs } = require('./runtime.cjs');
 const { arrowStatus, changeArrow, openSystemCheck } = require('./windows-maintenance.cjs');
 const { checkApi } = require('./ai-connection.cjs');
-const { startupArg, portableExecutable, loginStatus, setLogin } = require('./startup.cjs');
+const { startupArg, loginStatus, setLogin } = require('./startup.cjs');
 const { createSchedule } = require('./schedule.cjs');
 const { createReminderNotifications } = require('./reminder-notifications.cjs');
-const { shellAppId, brandName, prepareWindowsBrand } = require('./windows-brand.cjs');
+const { shellAppId, prepareWindowsBrand } = require('./windows-brand.cjs');
 
 const origin = 'app://jinkra';
 const dist = path.resolve(__dirname, '../dist');
@@ -54,11 +54,11 @@ let renameInProgress = false;
 let videoJob;
 let showOnReady = !process.argv.includes(startupArg);
 let dashboardReady = false;
-const registerBrand = prepareWindowsBrand(icon);
+const windowsBrand = prepareWindowsBrand(icon, windowIcon);
 const notify = createReminderNotifications(() => window, () => {
   showWindow();
   window.webContents.send('toolbox:schedule:open');
-}, icon, registerBrand);
+}, icon, windowsBrand.register);
 const schedule = createSchedule((item) => {
   void notify(item).catch((error) => console.error('日程通知', error.message));
 }, () => {
@@ -80,24 +80,21 @@ function signalSplash() {
   }
 }
 
-async function setupWindow() {
+async function setupWindow(iconPath) {
   window = new BrowserWindow({
     title: 'Jinkra 工具箱', width: 1300, height: 880, minWidth: 640, minHeight: 600,
-    backgroundColor: '#f4f7fc', icon: windowIcon, autoHideMenuBar: true, show: false,
+    backgroundColor: '#f4f7fc', icon: iconPath, autoHideMenuBar: true, show: false, skipTaskbar: true,
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#fffeff', symbolColor: '#344865', height: 52 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, devTools: !app.isPackaged,
     },
   });
-  const target = portableExecutable();
-  window.setAppDetails({
-    appId: shellAppId, appIconPath: target ?? windowIcon, appIconIndex: 0,
-    ...(target && { relaunchCommand: `"${target}"`, relaunchDisplayName: brandName }),
-  });
+  window.setAppDetails({ appId: shellAppId });
   let painted = false;
   const reveal = () => {
     if (!painted || !dashboardReady) return;
+    window.setSkipTaskbar(false);
     if (showOnReady) showWindow();
     signalSplash();
   };
@@ -220,9 +217,10 @@ function setupIpc(activationReady) {
   ipc('schedule:save', schedule.save);
   ipc('schedule:remove', schedule.remove);
   ipc('schedule:test', schedule.test);
-  ipc('update:check', checkUpdate);
-  ipc('update:error', getUpdateError);
-  ipc('update:install', () => installUpdate((progress) => window.webContents.send('toolbox:update:progress', progress)));
+  ipc('update:check', checkUpdate, false);
+  ipc('update:notes', getReleaseNotes, false);
+  ipc('update:error', getUpdateError, false);
+  ipc('update:install', () => installUpdate((progress) => window.webContents.send('toolbox:update:progress', progress)), false);
   ipc('files', async (kind, multiple) => {
     if (!Object.hasOwn(fileFilters, kind)) throw new Error('不支持该文件类型。');
     const result = await dialog.showOpenDialog(window, {
@@ -315,6 +313,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => { quitting = true; schedule.stop(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   app.whenReady().then(async () => {
+    void cleanCompletedUpdate().catch(() => {});
     protocol.handle('app', async (request) => {
       const address = new URL(request.url);
       if (address.host !== 'jinkra' || request.method !== 'GET') return new Response(null, { status: 404 });
@@ -340,11 +339,12 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
     Menu.setApplicationMenu(null);
-    // Resolve the Windows attribution in parallel with the dashboard startup.
-    void registerBrand();
+    // Explorer resolves and caches the taskbar identity when the first window appears.
+    const brandingReady = windowsBrand.register();
     const activationReady = loadActivation();
     setupIpc(activationReady);
-    if (!await setupWindow()) return;
+    await brandingReady;
+    if (!await setupWindow(await windowsBrand.icon())) return;
     tray = new Tray(icon);
     tray.setToolTip('Jinkra 工具箱');
     tray.setContextMenu(Menu.buildFromTemplate([

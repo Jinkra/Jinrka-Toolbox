@@ -249,6 +249,14 @@ progress { width: 100%; height: 7px; accent-color: #285ba1; }
 .about dt { margin-top: 11px; font-weight: 700; }
 .about dd { margin: 3px 0 0; color: var(--muted); line-height: 1.6; font-size: 12px; }
 .update-dialog > * + *, .update-body > * + * { margin-top: 12px; }
+.update-dialog { width: min(520px, calc(100vw - 32px)); }
+.release-details { display: grid; gap: 7px; }
+.release-details h3 { font-size: 13px; }
+.release-notes { max-height: 30vh; overflow: auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--inset); color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.release-notes h1, .release-notes h2, .release-notes h3, .release-notes h4 { font-size: 13px; color: var(--ink); }
+.release-notes ul, .release-notes ol { margin: 5px 0; padding-inline-start: 20px; }
+.release-notes > * + * { margin-top: 5px; }
+.update-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .download-info { display: flex; justify-content: space-between; gap: 12px; color: #385373; font: 11px var(--mono); }
 .settings-dialog { width: min(510px, calc(100vw - 32px)); padding: 17px 20px 20px; }
 .settings-group { border-top: 1px solid var(--line); padding-top: 13px; margin-top: 13px; display: grid; gap: 9px; }

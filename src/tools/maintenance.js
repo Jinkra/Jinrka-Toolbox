@@ -1,6 +1,6 @@
 import { actions, area, box, button, el, field, makeStatus, nativeFiles, select, task } from '../ui.js';
 
-const windowsOnly = () => box(el('p', { class: 'hint' }, '请在 Windows 便携版中打开此工具。'));
+const windowsOnly = () => box(el('p', { class: 'hint' }, '请在 Windows 安装版中打开此工具。'));
 
 function arrowTool() {
   if (!globalThis.desktop) return windowsOnly();

@@ -1,8 +1,8 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.8.1",
+  "version": "1.8.3",
   "private": true,
-  "description": "Jinkra 工具箱 · Windows 便携离线工具",
+  "description": "Jinkra 工具箱 · Windows 离线工具",
   "author": "Jinkra",
   "type": "module",
   "main": "desktop/main.cjs",
@@ -15,10 +15,10 @@
     "start": "electron .",
     "desktop": "npm run build && npm start",
     "predist": "node scripts/prepare-ffmpeg.mjs && node scripts/prepare-updater.mjs",
-    "dist": "npm run build && node scripts/build-portable.cjs"
+    "dist": "npm run build && node scripts/build-installer.cjs"
   },
   "build": {
-    "appId": "com.jinkra.toolbox",
+    "appId": "Jinkra.Toolbox.Desktop",
     "productName": "Jinkra 工具箱",
     "asar": true,
     "electronFuses": {
@@ -66,13 +66,18 @@
         "to": "jinkra-memory.exe"
       }
     ],
-    "portable": {
-      "useZip": true
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": false,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Jinkra-Toolbox"
     },
     "win": {
       "icon": "assets/icon.ico",
       "signExecutable": false,
-      "artifactName": "Jinkra-Toolbox-${version}-${arch}.${ext}"
+      "artifactName": "Jinkra-Toolbox-Payload-${version}-${arch}.${ext}"
     }
   },
   "dependencies": {

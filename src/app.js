@@ -201,7 +201,7 @@ function home() {
   return [
     el('header', { class: 'home-hero' },
       el('div', { class: 'home-hero-copy' },
-        el('div', { class: 'hero-meta' }, icon('Grid2X2', 14), 'Windows 便携版'),
+        el('div', { class: 'hero-meta' }, icon('Grid2X2', 14), 'Windows 安装版'),
         el('h1', { tabindex: '-1' }, 'Jinkra 工具箱'),
         el('div', { class: 'hero-facts' }, el('span', {}, `版本 ${version}`), el('span', {}, `${tools.length} 个工具`)),
         el('div', { class: 'hero-actions' },
@@ -343,11 +343,12 @@ function openSettings() {
     localStorage.setItem(preferenceKey, JSON.stringify(preferences));
     applyPreferences();
     if (key === 'mode') setMode(value);
-    if (key === 'autoCheck' && value && globalThis.desktop) void desktop.checkUpdate().then(showUpdateResult).catch(() => {});
+    if (key === 'autoCheck' && value && globalThis.desktop) void checkStartupUpdate();
   };
   for (const [key, control] of [['mode', mode], ['density', density], ['motion', motion], ['autoCheck', auto], ['close', close]]) {
     control.addEventListener('change', () => set(key, control.type === 'checkbox' ? control.checked : control.value));
   }
+  const updateStatus = makeStatus();
   const preferencesGroup = (title, ...children) => el('section', { class: 'settings-group' }, el('h3', {}, title), children);
   settingsDialog.replaceChildren(
     el('div', { class: 'dialog-title' }, el('h2', {}, '设置'), iconButton('X', '关闭设置', () => settingsDialog.close())),
@@ -357,13 +358,13 @@ function openSettings() {
       button('查看快捷方式', () => { settingsDialog.close(); openAbout(); }, 'quiet', 'CircleHelp')),
     globalThis.desktop && preferencesGroup('软件更新',
       el('div', { class: 'settings-update' }, el('p', { class: 'hint' }, `当前版本 ${version}`),
-        button('检查更新', () => { settingsDialog.close(); openUpdate(false); }, 'secondary', 'ArrowDownUp')), autoLabel),
+        button('检查更新', manualCheck(updateStatus, () => settingsDialog.close()), 'secondary', 'ArrowDownUp')), updateStatus.node, autoLabel),
   );
   settingsDialog.showModal();
   if (globalThis.desktop) void desktop.windowLoginStatus().then(({ available, enabled }) => {
     login.disabled = !available;
     login.checked = enabled;
-    loginStatus.set(available ? '' : '从便携 EXE 启动后可以设置开机自启。');
+    loginStatus.set(available ? '' : '安装工具箱后可以设置开机自启。');
   }).catch(() => loginStatus.set('无法读取 Windows 启动设置。', 'error'));
 }
 
@@ -387,17 +388,19 @@ const topControls = el('div', { class: 'header-controls', hidden: true },
   el('div', { class: 'searchbox' }, icon('Search', 16), search, keycap, clear),
   modeSwitcher, globalThis.desktop && pin, iconButton('Settings2', '设置', openSettings));
 windowBar.append(brand(), topControls);
-const updateButton = button('发现新版', () => openUpdate(true), 'secondary', 'ArrowDownUp');
+const updateButton = button('发现新版', () => openUpdate(state.update), 'secondary', 'ArrowDownUp');
 updateButton.classList.add('update-button');
 updateButton.hidden = true;
+const sidebarUpdateStatus = makeStatus();
 const versionLabel = el(globalThis.desktop ? 'button' : 'span', {
   class: 'sidebar-version', type: globalThis.desktop ? 'button' : null,
-  title: globalThis.desktop ? '检查更新' : null, onclick: globalThis.desktop ? () => openUpdate(false) : null,
+  title: globalThis.desktop ? '检查更新' : null, onclick: globalThis.desktop ? manualCheck(sidebarUpdateStatus) : null,
 }, `版本号：${version}`);
 const copyright = el('p', { class: 'app-copyright' },
   '© 2026 Jinkra . All Rights Reserved. | Made by ', creatorLink('Jinkra'));
 workspace.append(el('aside', { class: 'sidebar' }, navigation, el('footer', { class: 'sidebar-footer' }, updateButton,
-  el('div', { class: 'version-line' }, versionLabel, el('span', { class: 'activated-label' }, '已激活')), copyright)), content);
+  el('div', { class: 'version-line' }, versionLabel, el('span', { class: 'activated-label' }, '已激活')),
+  sidebarUpdateStatus.node, copyright)), content);
 workspace.hidden = true;
 frame.append(windowBar, workspace, dialog, settingsDialog, modeToast);
 boot.classList.remove('initial-boot');
@@ -406,14 +409,54 @@ root.append(frame);
 
 const updateDialog = el('dialog', { class: 'about update-dialog' });
 frame.append(updateDialog);
+let checkingUpdate;
 
-function showUpdateResult(update) {
-  state.update = update;
-  updateButton.hidden = !update;
-  updateButton.lastChild.textContent = update ? `更新至 ${update.version}` : '发现新版';
+function checkForUpdates() {
+  checkingUpdate ??= desktop.checkUpdate().then((update) => {
+    state.update = update;
+    updateButton.hidden = !update;
+    updateButton.lastChild.textContent = update ? `更新至 ${update.version}` : '发现新版';
+    return update;
+  }).finally(() => { checkingUpdate = undefined; });
+  return checkingUpdate;
 }
 
-function openUpdate(known, message = '') {
+function manualCheck(status, beforeOpen) {
+  return task(status, async () => {
+    const update = await checkForUpdates();
+    if (!update) {
+      status.set(`当前已是最新版本 ${version}。`, 'success');
+      return;
+    }
+    status.set('');
+    beforeOpen?.();
+    openUpdate(update);
+  }, '正在查询最新版本...');
+}
+
+async function checkStartupUpdate(message = '') {
+  if (message) openUpdate(null, message);
+  if (!preferences.autoCheck) return;
+  const update = await checkForUpdates().catch(() => null);
+  if (update && preferences.autoCheck) openUpdate(update);
+}
+
+async function showReleaseNotes(node, version) {
+  try {
+    const notes = await desktop.updateNotes(version);
+    if (!notes) { node.textContent = '暂时无法获取此版本的发布备注。'; return; }
+    const [{ marked }, { default: purifier }] = await Promise.all([import('marked'), import('dompurify')]);
+    const markdown = await marked.parse(notes, { gfm: true });
+    node.replaceChildren(purifier.sanitize(markdown, {
+      ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'strong', 'em', 'code', 'pre', 'blockquote', 'hr', 'br'],
+      ALLOWED_ATTR: [], RETURN_DOM_FRAGMENT: true,
+    }));
+  } catch {
+    node.textContent = '暂时无法获取此版本的发布备注。';
+  }
+}
+
+function openUpdate(update, message = '') {
   if (updateDialog.open) return;
   const status = makeStatus();
   const progress = el('progress', { max: 100, hidden: true, 'aria-label': '下载进度' });
@@ -421,54 +464,54 @@ function openUpdate(known, message = '') {
     el('span', { class: 'download-size' }), el('span', { class: 'download-speed' }));
   const close = iconButton('X', '关闭更新提示', () => updateDialog.close());
   const updateBody = el('div', { class: 'update-body' });
-  const draw = (update) => {
-    updateBody.replaceChildren(...(update
-      ? [el('p', {}, `当前版本 ${version}，最新版本 ${update.version}。`),
-        el('p', { class: 'hint' }, update.canInstall ? '更新后会重新打开软件，首次使用新版本需要重新激活。' : '请用便携 EXE 打开工具箱进行更新。'),
-        update.canInstall && button('下载并更新', task(status, async (event) => {
-          const action = event.currentTarget;
-          action.disabled = true;
-          close.disabled = true;
-          progress.hidden = false;
-          downloadInfo.hidden = true;
-          progress.removeAttribute('value');
-          updateDialog.oncancel = (cancel) => cancel.preventDefault();
-          const unsubscribe = desktop.onUpdateProgress(({ stage, received, total, speed, line }) => {
-            downloadInfo.hidden = stage === 'probe';
-            downloadInfo.children[0].textContent = total ? `${readableSize(received)} / ${readableSize(total)}` : `已下载 ${readableSize(received)}`;
-            downloadInfo.children[1].textContent = stage === 'download' ? `${readableSize(speed)}/秒` : '';
-            const percent = total ? Math.min(100, Math.floor(received * 100 / total)) : null;
-            if (stage === 'probe' || percent === null) progress.removeAttribute('value');
-            else progress.value = percent;
-            status.set(stage === 'probe' ? '正在测试更新线路…' : stage === 'switch' ? `正在切换到 ${line}…`
-              : stage === 'verify' ? '下载完成，正在校验 SHA-256…' : stage === 'restart' ? '校验通过，正在重新启动…'
-                : `${line} · 下载进度 ${percent}%`);
-          });
-          try {
-            await desktop.installUpdate();
-          } catch (error) {
-            action.disabled = false;
-            close.disabled = false;
-            updateDialog.oncancel = null;
-            progress.hidden = true;
-            throw error;
-          } finally {
-            unsubscribe();
-          }
-        }, '正在测试更新线路…'), 'primary', 'ArrowDownUp')].filter(Boolean)
-      : [el('p', {}, `当前已是最新版本 ${version}。`)]));
-  };
+  if (update) {
+    const notes = el('div', { class: 'release-notes' }, '正在读取发布备注…');
+    void showReleaseNotes(notes, update.version);
+    const later = button('稍后再说', () => updateDialog.close(), 'quiet');
+    const install = update.canInstall && button('下载并更新', task(status, async (event) => {
+      const action = event.currentTarget;
+      action.disabled = true;
+      close.disabled = true;
+      later.disabled = true;
+      progress.hidden = false;
+      downloadInfo.hidden = true;
+      progress.removeAttribute('value');
+      updateDialog.oncancel = (cancel) => cancel.preventDefault();
+      const unsubscribe = desktop.onUpdateProgress(({ stage, received, total, speed, line }) => {
+        downloadInfo.hidden = stage === 'probe';
+        downloadInfo.children[0].textContent = total ? `${readableSize(received)} / ${readableSize(total)}` : `已下载 ${readableSize(received)}`;
+        downloadInfo.children[1].textContent = stage === 'download' ? `${readableSize(speed)}/秒` : '';
+        const percent = total ? Math.min(100, Math.floor(received * 100 / total)) : null;
+        if (stage === 'probe' || percent === null) progress.removeAttribute('value');
+        else progress.value = percent;
+        status.set(stage === 'probe' ? '正在测试更新线路…' : stage === 'switch' ? `正在切换到 ${line}…`
+          : stage === 'verify' ? '下载完成，正在校验 SHA-256…' : stage === 'restart' ? '校验通过，正在重新启动…'
+            : `${line} · 下载进度 ${percent}%`);
+      });
+      try {
+        await desktop.installUpdate();
+      } catch (error) {
+        action.disabled = false;
+        close.disabled = false;
+        later.disabled = false;
+        updateDialog.oncancel = null;
+        progress.hidden = true;
+        downloadInfo.hidden = true;
+        throw error;
+      } finally {
+        unsubscribe();
+      }
+    }, '正在测试更新线路…'), 'primary', 'ArrowDownUp');
+    updateBody.append(
+      el('p', {}, `当前版本 ${version}，最新版本 ${update.version}。`),
+      el('section', { class: 'release-details' }, el('h3', {}, '版本更新内容'), notes),
+      el('p', { class: 'hint' }, update.canInstall ? '更新后会重新打开软件，首次使用新版本需要重新激活。' : '请用 Windows 安装包安装工具箱后再更新。'),
+      el('div', { class: 'update-actions' }, later, install),
+    );
+  }
   updateDialog.replaceChildren(el('div', { class: 'dialog-title' }, el('h2', {}, '软件更新'), close), updateBody, progress, downloadInfo, status.node);
   updateDialog.showModal();
   if (message) status.set(message, 'error');
-  else if (known && state.update) draw(state.update);
-  else {
-    status.set('正在查询最新版本...');
-    void desktop.checkUpdate().then((update) => {
-      showUpdateResult(update);
-      if (status.node.isConnected) { status.set(''); draw(update); }
-    }).catch(() => status.set('暂时无法确认最新版本，请稍后重试。', 'error'));
-  }
 }
 
 function reveal(next) {
@@ -500,10 +543,6 @@ function enter() {
     state.shortcut = desktopState.shortcutRegistered;
     paintPin();
   }).catch(() => {});
-  if (globalThis.desktop) {
-    void desktop.updateError().then((message) => { if (message) openUpdate(false, message); }).catch(() => {});
-    if (preferences.autoCheck) void desktop.checkUpdate().then(showUpdateResult).catch(() => {});
-  }
 }
 
 if (globalThis.desktop) {
@@ -548,6 +587,7 @@ async function start() {
     const activation = globalThis.desktop ? await desktop.activationState() : { active: true };
     if (activation.active) enter();
     else lock();
+    if (globalThis.desktop) void desktop.updateError().catch(() => '').then(checkStartupUpdate);
   } catch {
     boot.replaceChildren(el('section', { class: 'gateway-card' }, el('h1', {}, '无法启动'),
       el('p', {}, '无法读取本地激活状态。'), button('重新加载', () => location.reload(), 'primary')));

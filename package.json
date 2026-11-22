@@ -1,6 +1,6 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.8.5",
+  "version": "1.8.6",
   "private": true,
   "description": "Jinkra 工具箱 · Windows 离线工具",
   "author": "Jinkra",
@@ -64,6 +64,10 @@
       {
         "from": "vendor/updater/jinkra-memory.exe",
         "to": "jinkra-memory.exe"
+      },
+      {
+        "from": "vendor/updater/jinkra-uninstall-ui.exe",
+        "to": "jinkra-uninstall-ui.exe"
       }
     ],
     "nsis": {

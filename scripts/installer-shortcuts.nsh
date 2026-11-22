@@ -1,3 +1,21 @@
+!macro jinkraUninstallWizard
+  ${IfNot} ${Silent}
+    IfFileExists "$INSTDIR\resources\jinkra-uninstall-ui.exe" 0 jinkra_uninstall_native
+    IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 jinkra_uninstall_native
+    InitPluginsDir
+    SetOutPath "$PLUGINSDIR"
+    ClearErrors
+    CopyFiles /SILENT "$INSTDIR\resources\jinkra-uninstall-ui.exe" "$PLUGINSDIR"
+    IfErrors jinkra_uninstall_native
+    ExecWait '"$PLUGINSDIR\jinkra-uninstall-ui.exe" --uninstall "$INSTDIR"' $R8
+    IfErrors jinkra_uninstall_native
+    SetErrorLevel $R8
+    Quit
+  jinkra_uninstall_native:
+    SetOutPath "$INSTDIR"
+  ${EndIf}
+!macroend
+
 !macro customInstall
   ${GetParameters} $R8
   ClearErrors

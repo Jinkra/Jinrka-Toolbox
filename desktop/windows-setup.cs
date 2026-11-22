@@ -34,6 +34,8 @@ internal sealed class ToolboxSetup : Form {
     private readonly CheckBox desktopShortcut;
     private readonly CheckBox taskbarGuide;
     private readonly CheckBox quickLaunch;
+    private readonly CheckBox keepData;
+    private readonly bool removing;
     private readonly ProgressBar progress = new ProgressBar();
     private bool running;
     private bool complete;
@@ -45,9 +47,10 @@ internal sealed class ToolboxSetup : Form {
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
 
-    private ToolboxSetup(Image avatar) {
+    private ToolboxSetup(Image avatar, string uninstallDirectory = null) {
         this.avatar = avatar;
-        Text = "Jinkra-Toolbox 安装向导";
+        removing = uninstallDirectory != null;
+        Text = removing ? "Jinkra-Toolbox 卸载向导" : "Jinkra-Toolbox 安装向导";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
@@ -64,15 +67,17 @@ internal sealed class ToolboxSetup : Form {
         };
         FormClosing += delegate(object sender, FormClosingEventArgs args) { if (running) args.Cancel = true; };
 
-        headline = PlaceLabel("安装 Jinkra 工具箱", 300, 77, 410, 44, 23, Ink, FontStyle.Bold);
-        detail = PlaceLabel("选择工具箱的安装位置。", 301, 127, 402, 28, 10, Muted, FontStyle.Regular);
+        headline = PlaceLabel(removing ? "卸载 Jinkra 工具箱" : "安装 Jinkra 工具箱", 300, 77, 410, 44, 23, Ink, FontStyle.Bold);
+        detail = PlaceLabel(removing ? "将从这台电脑移除工具箱及其快捷方式。" : "选择工具箱的安装位置。",
+            301, 127, 402, 28, 10, Muted, FontStyle.Regular);
         PlaceLabel("安装目录", 301, 177, 380, 23, 10, Ink, FontStyle.Bold);
 
         directory.SetBounds(316, 216, 291, 24);
         directory.BorderStyle = BorderStyle.None;
         directory.BackColor = Color.White;
         directory.ForeColor = Ink;
-        directory.Text = DefaultDirectory();
+        directory.Text = uninstallDirectory ?? DefaultDirectory();
+        directory.ReadOnly = removing;
         directory.AccessibleName = "安装目录";
         Controls.Add(directory);
         browse = PlaceButton("浏览…", 617, 204, 89, 42, false);
@@ -81,7 +86,14 @@ internal sealed class ToolboxSetup : Form {
         desktopShortcut = PlaceChoice("创建桌面快捷方式", 262, true);
         taskbarGuide = PlaceChoice("安装后引导固定到任务栏", 291, false);
         quickLaunch = PlaceChoice("添加到快捷启动栏", 320, false);
-        status = PlaceLabel("仅为当前 Windows 用户安装。", 301, 361, 409, 48, 9, Muted, FontStyle.Regular);
+        browse.Visible = desktopShortcut.Visible = taskbarGuide.Visible = quickLaunch.Visible = !removing;
+        keepData = PlaceChoice("保留用户数据", 262, true);
+        keepData.Visible = removing;
+        status = PlaceLabel(removing ? "保留本地设置、日程和激活记录。" : "仅为当前 Windows 用户安装。",
+            301, removing ? 302 : 361, 409, 48, 9, Muted, FontStyle.Regular);
+        keepData.CheckedChanged += delegate {
+            SetStatus(keepData.Checked ? "保留本地设置、日程和激活记录。" : "本地设置、日程和激活记录将被清除。", !keepData.Checked);
+        };
         progress.SetBounds(302, 412, 404, 10);
         progress.Visible = false;
         progress.AccessibleName = "安装进度";
@@ -89,12 +101,20 @@ internal sealed class ToolboxSetup : Form {
 
         back = PlaceButton("取消", 466, 448, 98, 43, false);
         back.Click += delegate { Close(); };
-        next = PlaceButton("立即安装", 577, 448, 129, 43, true);
-        next.Click += delegate { if (complete) OpenToolbox(); else BeginInstall(); };
+        next = PlaceButton(removing ? "卸载" : "立即安装", 577, 448, 129, 43, true);
+        if (removing) {
+            next.BackColor = Color.FromArgb(163, 52, 77);
+            next.FlatAppearance.MouseOverBackColor = Color.FromArgb(145, 39, 64);
+        }
+        next.Click += delegate {
+            if (removing) { if (complete) Close(); else BeginUninstall(); }
+            else if (complete) OpenToolbox();
+            else BeginInstall();
+        };
         close = PlaceButton("×", 699, 17, 40, 34, false);
         close.AccessibleName = "关闭安装向导";
         close.Click += delegate { Close(); };
-        AcceptButton = next;
+        AcceptButton = removing ? back : next;
         CancelButton = back;
         if (SystemInformation.IsMenuAnimationEnabled) {
             Opacity = 0;
@@ -155,6 +175,8 @@ internal sealed class ToolboxSetup : Form {
         using (var centered = new StringFormat { Alignment = StringAlignment.Center }) {
             g.DrawString("Jinkra Toolbox", display, dark, new RectangleF(0, 312, BrandWidth, 48), centered);
             g.DrawString("Windows x64", small, subtle, new RectangleF(0, 368, BrandWidth, 24), centered);
+            string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+            g.DrawString("版本 " + version, small, subtle, new RectangleF(0, 402, BrandWidth, 24), centered);
         }
         using (GraphicsPath input = Rounded(new RectangleF(301, 204, 307, 42), 10))
         using (var border = new Pen(Color.FromArgb(198, 215, 239)))
@@ -230,6 +252,64 @@ internal sealed class ToolboxSetup : Form {
             if (taskbarGuide.Checked) next.Enabled = false;
             else Close();
         } catch (Exception error) { SetStatus("无法打开工具箱。" + error.Message, true); }
+    }
+
+    private async void BeginUninstall() {
+        string target = directory.Text;
+        bool keep = keepData.Checked;
+        running = true;
+        keepData.Enabled = back.Enabled = next.Enabled = close.Enabled = false;
+        headline.Text = "正在卸载工具箱";
+        detail.Text = "正在移除程序文件和快捷方式。";
+        SetStatus(keep ? "将保留用户数据。" : "将清除用户数据。", false);
+        progress.Style = ProgressBarStyle.Marquee;
+        progress.Visible = true;
+        try {
+            await Task.Run(() => Uninstall(target, keep));
+            complete = true;
+            headline.Text = "卸载完成";
+            detail.Text = "已移除 Jinkra 工具箱。";
+            string data = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            bool remaining = !keep && (Directory.Exists(Path.Combine(data, Path.GetFileNameWithoutExtension(ProductExe))) ||
+                Directory.Exists(Path.Combine(data, "jinkra-toolbox")));
+            SetStatus(keep ? "已保留用户数据。" : remaining ? "部分用户数据仍在，可能仍被程序占用。" : "已清除用户数据。", remaining);
+            progress.Style = ProgressBarStyle.Continuous;
+            progress.Value = 100;
+            next.Text = "完成";
+            next.BackColor = Blue;
+            next.FlatAppearance.MouseOverBackColor = Color.FromArgb(35, 77, 147);
+            back.Visible = false;
+            AcceptButton = next;
+        } catch (Exception error) {
+            headline.Text = "卸载未完成";
+            detail.Text = "可以关闭工具箱后重试。";
+            SetStatus(error.Message, true);
+            progress.Visible = false;
+            keepData.Enabled = true;
+        } finally {
+            running = false;
+            back.Enabled = next.Enabled = close.Enabled = true;
+        }
+    }
+
+    private static void Uninstall(string directory, bool keepData) {
+        string work = Path.Combine(Path.GetTempPath(), "jinkra-uninstall-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        string core = Path.Combine(work, "uninstall.exe");
+        try {
+            File.Copy(Path.Combine(directory, Uninstaller), core);
+            string options = keepData ? "/S" : "/S --delete-app-data";
+            using (Process removal = Process.Start(new ProcessStartInfo(core, options + " _?=" + directory) {
+                WorkingDirectory = work, UseShellExecute = false, CreateNoWindow = true
+            })) {
+                removal.WaitForExit();
+                if (removal.ExitCode != 0 || File.Exists(Path.Combine(directory, ProductExe))) {
+                    throw new IOException("无法完成卸载。请退出正在运行的工具箱。");
+                }
+            }
+        } finally {
+            try { File.Delete(core); Directory.Delete(work); } catch (IOException) {} catch (UnauthorizedAccessException) {}
+        }
     }
 
     private static bool IsInstalled(string folder) {
@@ -315,6 +395,11 @@ internal sealed class ToolboxSetup : Form {
 
     [STAThread]
     private static int Main(string[] args) {
+        string uninstallDirectory = null;
+        if (args.Length == 2 && args[0] == "--uninstall") {
+            try { uninstallDirectory = ValidateDirectory(args[1], true); }
+            catch { return 1; }
+        }
         if (args.Length == 1 && (args[0] == "--update" || args[0] == "--silent")) {
             try {
                 string location = Environment.GetEnvironmentVariable("JINKRA_SETUP_DIRECTORY") ?? DefaultDirectory();
@@ -322,12 +407,12 @@ internal sealed class ToolboxSetup : Form {
                 return 0;
             } catch { return 1; }
         }
-        SetCurrentProcessExplicitAppUserModelID("Jinkra.Toolbox.Setup");
+        SetCurrentProcessExplicitAppUserModelID(uninstallDirectory == null ? "Jinkra.Toolbox.Setup" : "Jinkra.Toolbox.Uninstall");
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         using (Stream logo = Assembly.GetExecutingAssembly().GetManifestResourceStream("logo.png"))
         using (Image avatar = Image.FromStream(logo))
-        using (var setup = new ToolboxSetup(avatar)) {
+        using (var setup = new ToolboxSetup(avatar, uninstallDirectory)) {
             Application.Run(setup);
             return setup.complete ? 0 : 2;
         }

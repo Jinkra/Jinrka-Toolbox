@@ -14,6 +14,7 @@ using Microsoft.Win32;
 [assembly: AssemblyCompany("Jinkra")]
 
 internal sealed class ToolboxSetup : Form {
+    private const int BrandWidth = 258;
     private const string ProductExe = "Jinkra 工具箱.exe";
     private const string Uninstaller = "Uninstall Jinkra 工具箱.exe";
     private const string InstallKey = @"Software\Jinkra\Toolbox";
@@ -127,19 +128,20 @@ internal sealed class ToolboxSetup : Form {
         Graphics g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        using (var wash = new LinearGradientBrush(new Rectangle(0, 0, 260, 435), Color.FromArgb(230, 242, 255), Color.FromArgb(204, 224, 250), 110f)) {
-            g.FillRectangle(wash, 0, 0, 258, Height);
+        using (var wash = new LinearGradientBrush(new Rectangle(0, 0, BrandWidth, Height), Color.FromArgb(230, 242, 255), Color.FromArgb(204, 224, 250), 110f)) {
+            g.FillRectangle(wash, 0, 0, BrandWidth, Height);
         }
         using (var rings = new Pen(Color.FromArgb(145, 176, 206, 241), 1)) {
             for (int offset = 0; offset < 3; offset++) g.DrawEllipse(rings, -35 + offset * 12, 34 + offset * 12, 329 - offset * 24, 329 - offset * 24);
         }
-        g.DrawImage(avatar, new Rectangle(49, 85, 159, 159));
+        g.DrawImage(avatar, new RectangleF((BrandWidth - 159) / 2f, 85, 159, 159));
         using (var dark = new SolidBrush(Ink))
         using (var subtle = new SolidBrush(Muted))
         using (var display = new Font("Segoe UI Semibold", 23, FontStyle.Bold))
-        using (var small = new Font("Consolas", 11)) {
-            g.DrawString("Jinkra Toolbox", display, dark, 28, 270);
-            g.DrawString("Windows x64", small, subtle, 32, 326);
+        using (var small = new Font("Consolas", 11))
+        using (var centered = new StringFormat { Alignment = StringAlignment.Center }) {
+            g.DrawString("Jinkra Toolbox", display, dark, new RectangleF(0, 270, BrandWidth, 48), centered);
+            g.DrawString("Windows x64", small, subtle, new RectangleF(0, 326, BrandWidth, 24), centered);
         }
         using (GraphicsPath input = Rounded(new RectangleF(301, 204, 307, 42), 10))
         using (var border = new Pen(Color.FromArgb(198, 215, 239)))

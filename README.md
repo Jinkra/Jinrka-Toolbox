@@ -6,7 +6,6 @@
 
 住在 Windows 上的离线百宝箱 · 开发 / 文本 / 媒体 / 文件 / AI / 系统工具一站集成
 
-[![下载最新版](https://img.shields.io/github/v/release/Jinkra/XJ-Toolbox?label=%E4%B8%8B%E8%BD%BD&color=1f6feb)](https://github.com/Jinkra/XJ-Toolbox/releases/latest)
 ![平台](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078d4)
 
 </div>

@@ -14,7 +14,7 @@ const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = 
 const { runtimeStatus, inspectDll, installRuntime, runtimeDocs } = require('./runtime.cjs');
 const { arrowStatus, changeArrow, openSystemCheck } = require('./windows-maintenance.cjs');
 const { checkApi } = require('./ai-connection.cjs');
-const { startupArg, loginStatus, setLogin } = require('./startup.cjs');
+const { startupArg, loginStatus, setLogin, migrateLogin } = require('./startup.cjs');
 const { createSchedule } = require('./schedule.cjs');
 const { createReminderNotifications } = require('./reminder-notifications.cjs');
 const { shellAppId, prepareWindowsBrand } = require('./windows-brand.cjs');
@@ -340,6 +340,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     Menu.setApplicationMenu(null);
     // Explorer resolves and caches the taskbar identity when the first window appears.
+    try { migrateLogin(); } catch (error) { console.warn('开机自启迁移失败', error.message); }
     const brandingReady = windowsBrand.register();
     const activationReady = loadActivation();
     setupIpc(activationReady);

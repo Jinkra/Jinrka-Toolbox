@@ -6,11 +6,13 @@ const path = require('node:path');
 const appId = 'com.jinkra.toolbox';
 // Electron reports positional login arguments but omits Chromium switches.
 const startupArg = 'jinkra-autostart';
+const uninstallers = ['Uninstall 小金工具箱.exe', 'Uninstall Jinkra 工具箱.exe'];
 
 function installedExecutable() {
   if (process.platform !== 'win32' || !app.isPackaged) return null;
   const executable = app.getPath('exe');
-  return existsSync(path.join(path.dirname(executable), 'Uninstall Jinkra 工具箱.exe')) ? executable : null;
+  const folder = path.dirname(executable);
+  return uninstallers.some((name) => existsSync(path.join(folder, name))) ? executable : null;
 }
 
 function loginStatus() {
@@ -33,4 +35,15 @@ async function setLogin(enabled) {
   return result;
 }
 
-module.exports = { appId, startupArg, installedExecutable, loginStatus, setLogin };
+// After the executable was renamed, an enabled login item still points at the old path.
+function migrateLogin() {
+  const target = installedExecutable();
+  if (!target) return;
+  const settings = app.getLoginItemSettings({ path: target, args: [startupArg] });
+  const item = settings.launchItems.find((entry) => entry.name === appId && entry.scope === 'user');
+  if (!item?.enabled || path.normalize(item.path).toLowerCase() === target.toLowerCase()) return;
+  if (path.normalize(path.dirname(item.path)).toLowerCase() !== path.dirname(target).toLowerCase()) return;
+  app.setLoginItemSettings({ openAtLogin: true, enabled: true, name: appId, path: target, args: [startupArg] });
+}
+
+module.exports = { appId, startupArg, installedExecutable, loginStatus, setLogin, migrateLogin };

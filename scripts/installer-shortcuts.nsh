@@ -21,12 +21,12 @@
   ClearErrors
   ${GetOptions} $R8 "/JINKRA_QUICK_LAUNCH" $R9
   ${IfNot} ${Errors}
-    ${IfNot} ${FileExists} "$QUICKLAUNCH\Jinkra-Toolbox.lnk"
+    ${IfNot} ${FileExists} "$QUICKLAUNCH\小金工具箱.lnk"
       CreateDirectory "$QUICKLAUNCH"
       ClearErrors
-      CreateShortCut "$QUICKLAUNCH\Jinkra-Toolbox.lnk" "$appExe" "" "$appExe" 0
+      CreateShortCut "$QUICKLAUNCH\小金工具箱.lnk" "$appExe" "" "$appExe" 0
       ${IfNot} ${Errors}
-        WinShell::SetLnkAUMI "$QUICKLAUNCH\Jinkra-Toolbox.lnk" "${APP_ID}"
+        WinShell::SetLnkAUMI "$QUICKLAUNCH\小金工具箱.lnk" "${APP_ID}"
         WriteRegStr HKCU "Software\Jinkra\Toolbox" "QuickLaunchTarget" "$appExe"
       ${EndIf}
     ${EndIf}
@@ -37,6 +37,12 @@
   ${IfNot} ${isKeepShortcuts}
     ReadRegStr $R8 HKCU "Software\Jinkra\Toolbox" "QuickLaunchTarget"
     ${If} $R8 == "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+      WinShell::UninstShortcut "$QUICKLAUNCH\小金工具箱.lnk"
+      Delete "$QUICKLAUNCH\小金工具箱.lnk"
+      DeleteRegValue HKCU "Software\Jinkra\Toolbox" "QuickLaunchTarget"
+    ${EndIf}
+    ; Releases before 1.9.0 used the old shortcut name.
+    ${If} $R8 == "$INSTDIR\Jinkra 工具箱.exe"
       WinShell::UninstShortcut "$QUICKLAUNCH\Jinkra-Toolbox.lnk"
       Delete "$QUICKLAUNCH\Jinkra-Toolbox.lnk"
       DeleteRegValue HKCU "Software\Jinkra\Toolbox" "QuickLaunchTarget"

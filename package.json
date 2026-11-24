@@ -1,6 +1,6 @@
 {
   "name": "jinkra-toolbox",
-  "version": "1.8.9",
+  "version": "1.9.0",
   "private": true,
   "description": "小金工具箱 · Windows 离线工具",
   "author": "Jinkra",
@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "Jinkra.Toolbox.Desktop",
-    "productName": "Jinkra 工具箱",
+    "productName": "小金工具箱",
     "asar": true,
     "electronFuses": {
       "runAsNode": false,
@@ -76,7 +76,7 @@
       "runAfterFinish": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Jinkra-Toolbox",
+      "shortcutName": "小金工具箱",
       "include": "scripts/installer-shortcuts.nsh"
     },
     "win": {

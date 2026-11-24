@@ -16,9 +16,13 @@ using Microsoft.Win32;
 
 internal sealed class ToolboxSetup : Form {
     private const int BrandWidth = 258;
-    private const string ProductExe = "Jinkra 工具箱.exe";
-    private const string Uninstaller = "Uninstall Jinkra 工具箱.exe";
-    private const string ShortcutName = "Jinkra-Toolbox.lnk";
+    private const string ProductExe = "小金工具箱.exe";
+    private const string Uninstaller = "Uninstall 小金工具箱.exe";
+    private const string ShortcutName = "小金工具箱.lnk";
+    // Names used before 1.9.0; upgrades must still find and replace them.
+    private const string LegacyExe = "Jinkra 工具箱.exe";
+    private const string LegacyUninstaller = "Uninstall Jinkra 工具箱.exe";
+    private const string LegacyShortcutName = "Jinkra-Toolbox.lnk";
     private const string InstallKey = @"Software\Jinkra\Toolbox";
     private static readonly Color Ink = Color.FromArgb(23, 44, 76);
     private static readonly Color Blue = Color.FromArgb(43, 91, 167);
@@ -299,7 +303,8 @@ internal sealed class ToolboxSetup : Form {
         Directory.CreateDirectory(work);
         string core = Path.Combine(work, "uninstall.exe");
         try {
-            File.Copy(Path.Combine(directory, Uninstaller), core);
+            if (File.Exists(Path.Combine(directory, Uninstaller))) TryDelete(Path.Combine(directory, LegacyExe));
+            File.Copy(Path.Combine(directory, File.Exists(Path.Combine(directory, Uninstaller)) ? Uninstaller : LegacyUninstaller), core);
             string options = keepData ? "/S" : "/S --delete-app-data";
             using (Process removal = Process.Start(new ProcessStartInfo(core, options + " _?=" + directory) {
                 WorkingDirectory = work, UseShellExecute = false, CreateNoWindow = true
@@ -315,7 +320,8 @@ internal sealed class ToolboxSetup : Form {
     }
 
     private static bool IsInstalled(string folder) {
-        return File.Exists(Path.Combine(folder, ProductExe)) && File.Exists(Path.Combine(folder, Uninstaller));
+        return (File.Exists(Path.Combine(folder, ProductExe)) && File.Exists(Path.Combine(folder, Uninstaller))) ||
+            (File.Exists(Path.Combine(folder, LegacyExe)) && File.Exists(Path.Combine(folder, LegacyUninstaller)));
     }
 
     private static string DefaultDirectory() {
@@ -353,14 +359,19 @@ internal sealed class ToolboxSetup : Form {
         string quickLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             @"Microsoft\Internet Explorer\Quick Launch", ShortcutName);
         string target = Path.Combine(directory, ProductExe);
+        string legacyTarget = Path.Combine(directory, LegacyExe);
+        string legacyDesktop = Path.Combine(Path.GetDirectoryName(desktopLink), LegacyShortcutName);
+        string legacyQuick = Path.Combine(Path.GetDirectoryName(quickLink), LegacyShortcutName);
+        bool migrating = File.Exists(Path.Combine(directory, LegacyUninstaller));
         if (update) {
             foreach (string shortcut in new[] { desktopLink, quickLink }) {
                 if (File.Exists(shortcut)) shortcuts.Add(shortcut, File.ReadAllBytes(shortcut));
             }
-            desktop = shortcuts.ContainsKey(desktopLink);
+            desktop = shortcuts.ContainsKey(desktopLink) || (migrating && File.Exists(legacyDesktop));
             using (RegistryKey key = Registry.CurrentUser.OpenSubKey(InstallKey)) {
-                quick = shortcuts.ContainsKey(quickLink) && key != null &&
-                    String.Equals(key.GetValue("QuickLaunchTarget") as string, target, StringComparison.OrdinalIgnoreCase);
+                string quickTarget = key == null ? null : key.GetValue("QuickLaunchTarget") as string;
+                quick = (shortcuts.ContainsKey(quickLink) && String.Equals(quickTarget, target, StringComparison.OrdinalIgnoreCase)) ||
+                    (migrating && File.Exists(legacyQuick) && String.Equals(quickTarget, legacyTarget, StringComparison.OrdinalIgnoreCase));
             }
         }
         string work = Path.Combine(Path.GetTempPath(), "jinkra-setup-" + Guid.NewGuid().ToString("N"));
@@ -389,13 +400,24 @@ internal sealed class ToolboxSetup : Form {
                 WorkingDirectory = work, UseShellExecute = false, CreateNoWindow = true
             })) {
                 setup.WaitForExit();
-                if (setup.ExitCode != 0 || !IsInstalled(directory)) {
+                if (setup.ExitCode != 0 || !File.Exists(target) || !File.Exists(Path.Combine(directory, Uninstaller))) {
                     throw new IOException("安装未完成。请关闭正在运行的工具箱并检查目录权限。");
+                }
+            }
+            if (migrating) {
+                // The old payload's files are replaced; drop shortcuts that still use the old name.
+                TryDelete(legacyDesktop);
+                TryDelete(legacyQuick);
+                TryDelete(Path.Combine(directory, LegacyUninstaller));
+                using (Stream stub = Assembly.GetExecutingAssembly().GetManifestResourceStream("legacy-launcher.exe"))
+                using (var file = new FileStream(legacyTarget, FileMode.Create, FileAccess.Write)) {
+                    stub.CopyTo(file);
                 }
             }
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(InstallKey)) {
                 key.SetValue("InstallLocation", directory);
                 if (update && quick) key.SetValue("QuickLaunchTarget", target);
+                else if (migrating) key.DeleteValue("QuickLaunchTarget", false);
             }
         } finally {
             try { File.Delete(payload); Directory.Delete(work); } catch (IOException) {} catch (UnauthorizedAccessException) {}
@@ -407,6 +429,10 @@ internal sealed class ToolboxSetup : Form {
                 }
             }
         }
+    }
+
+    private static void TryDelete(string file) {
+        try { if (File.Exists(file)) File.Delete(file); } catch (IOException) {} catch (UnauthorizedAccessException) {}
     }
 
     private static GraphicsPath Rounded(RectangleF bounds, float radius) {

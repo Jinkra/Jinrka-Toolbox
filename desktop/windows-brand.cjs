@@ -1,7 +1,8 @@
 const { app, shell } = require('electron');
 const { execFile } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { copyFile, mkdir, readFile, readdir, writeFile } = require('node:fs/promises');
+const { existsSync } = require('node:fs');
+const { copyFile, mkdir, readFile, readdir, rm, writeFile } = require('node:fs/promises');
 const { promisify } = require('node:util');
 const path = require('node:path');
 const { appId: previousId, installedExecutable } = require('./startup.cjs');
@@ -12,6 +13,7 @@ const shellAppId = 'Jinkra.Toolbox.Desktop';
 const ownedIds = [shellAppId, notificationId, 'Jinkra.Toolbox.Portable', previousId];
 const brandName = 'Jinkra-Toolbox';
 const displayName = '小金工具箱';
+const legacyShortcuts = ['Jinkra-Toolbox.lnk', 'Jinkra 工具箱.lnk'];
 const toastClsid = '{FDD365C6-1AC9-4DA9-8512-5E06D6789004}';
 const execute = promisify(execFile);
 const literal = (value) => "'" + value.replace(/'/g, "''") + "'";
@@ -95,7 +97,16 @@ async function registerBrand(icon, taskbarIcon) {
     { windowsHide: true, timeout: 5000 });
   const folder = stdout.trim();
   if (!path.isAbsolute(folder)) return true;
-  const shortcut = path.join(folder, brandName + '.lnk');
+  // Remove Start Menu entries from before the rename once they point at a missing or replaced executable.
+  for (const name of legacyShortcuts) {
+    const legacy = path.join(folder, name);
+    const existing = readShortcut(legacy);
+    if (!existing?.target || !ownedIds.includes(existing.appUserModelId)) continue;
+    if (path.dirname(existing.target).toLowerCase() === path.dirname(target).toLowerCase() || !existsSync(existing.target)) {
+      await rm(legacy, { force: true }).catch(() => {});
+    }
+  }
+  const shortcut = path.join(folder, displayName + '.lnk');
   const existing = readShortcut(shortcut);
   if (existing && !ownedIds.includes(existing.appUserModelId)) return true;
   if (existing?.target === target && existing.icon === taskbarIcon && existing.appUserModelId === shellAppId &&

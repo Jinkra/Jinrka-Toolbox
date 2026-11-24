@@ -26,6 +26,7 @@ async function buildInstaller() {
   const compiler = path.join(process.env.SystemRoot || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
   const staging = mkdtempSync(path.join(tmpdir(), 'jinkra-setup-build-'));
   const metadata = path.join(staging, 'SetupVersion.cs');
+  const launcher = path.join(staging, 'legacy-launcher.exe');
   const uninstaller = path.join(root, 'vendor', 'updater', 'jinkra-uninstall-ui.exe');
   const originalTemplates = nsis.nsisTemplatesDir;
   const compile = (output, resources = []) => {
@@ -34,6 +35,7 @@ async function buildInstaller() {
       '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/win32icon:' + path.join(root, 'assets', 'icon.ico'),
       '/out:' + output, ...resources,
       '/resource:' + path.join(root, 'assets', 'icon.png') + ',logo.png',
+      '/resource:' + launcher + ',legacy-launcher.exe',
       path.join(root, 'desktop', 'windows-setup.cs'), metadata,
     ], { stdio: 'inherit', windowsHide: true });
     if (result.error) throw result.error;
@@ -44,6 +46,11 @@ async function buildInstaller() {
 [assembly: AssemblyVersion(${JSON.stringify(version)})]
 [assembly: AssemblyInformationalVersion(${JSON.stringify(version)})]
 `);
+    const built = spawnSync(compiler, ['/nologo', '/codepage:65001', '/target:winexe', '/optimize+', '/platform:x64',
+      '/win32icon:' + path.join(root, 'assets', 'icon.ico'), '/out:' + launcher,
+      path.join(root, 'desktop', 'windows-legacy-launcher.cs')], { stdio: 'inherit', windowsHide: true });
+    if (built.error) throw built.error;
+    if (built.status !== 0) throw new Error('旧版启动入口编译失败。');
     mkdirSync(path.dirname(uninstaller), { recursive: true });
     compile(uninstaller);
     const templates = path.join(staging, 'nsis');

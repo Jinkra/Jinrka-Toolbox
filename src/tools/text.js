@@ -1,8 +1,8 @@
 import { actions, area, box, button, check, el, field, isPro, makeStatus, pro, proPanel, proValue, saveBlob, select, task, transformTool } from '../ui.js';
 
 function diffTool() {
-  const before = area('输入原文本…', 'Jinkra 工具箱\n开发工具\n文本工具');
-  const after = area('输入新文本…', 'Jinkra 工具箱\n开发工具\n媒体工具\n文件工具');
+  const before = area('输入原文本…', '小金工具箱\n开发工具\n文本工具');
+  const after = area('输入新文本…', '小金工具箱\n开发工具\n媒体工具\n文件工具');
   const status = makeStatus();
   const granularity = select([['lines', '行'], ['words', '词'], ['characters', '字符']]);
   const [spaceLabel, space] = check('忽略首尾空白（逐行时）');

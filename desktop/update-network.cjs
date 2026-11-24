@@ -5,7 +5,7 @@ const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { manifestName, validUpdate, verifiedManifest, releaseFilename, notesName, notesLimit, verifiedNotes } = require('./update-manifest.cjs');
 
-const repo = 'Jinkra/Jinrka-Toolbox';
+const repo = 'Jinkra/XJ-Toolbox';
 const releases = 'https://github.com/' + repo + '/releases';
 const releaseApi = 'https://api.github.com/repos/' + repo + '/releases';
 const lines = [

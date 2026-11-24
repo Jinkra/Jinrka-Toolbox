@@ -66,4 +66,4 @@ jobs:
           $name = "Jinkra-Toolbox-Setup-$version-x64.exe"
           $exe = Join-Path 'release' $name
           $sha = "$exe.sha256"
-          gh release create $env:RELEASE_TAG $exe $sha 'release/jinkra-install-update.json' 'release/jinkra-release-notes.json' --verify-tag --title "Jinkra 工具箱 $version" --notes-file 'release/jinkra-release-notes.md'
+          gh release create $env:RELEASE_TAG $exe $sha 'release/jinkra-install-update.json' 'release/jinkra-release-notes.json' --verify-tag --title "小金工具箱 $version" --notes-file 'release/jinkra-release-notes.md'

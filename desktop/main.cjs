@@ -82,7 +82,7 @@ function signalSplash() {
 
 async function setupWindow(iconPath) {
   window = new BrowserWindow({
-    title: 'Jinkra 工具箱', width: 1300, height: 880, minWidth: 640, minHeight: 600,
+    title: '小金工具箱', width: 1300, height: 880, minWidth: 640, minHeight: 600,
     backgroundColor: '#f4f7fc', icon: iconPath, autoHideMenuBar: true, show: false, skipTaskbar: true,
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#fffeff', symbolColor: '#344865', height: 52 },
     webPreferences: {
@@ -136,7 +136,7 @@ async function loadDashboard() {
     if (quitting || window.isDestroyed()) return false;
     signalSplash();
     const choice = await dialog.showMessageBox({
-      type: 'error', title: 'Jinkra 工具箱', message: '启动页面暂时无法加载。',
+      type: 'error', title: '小金工具箱', message: '启动页面暂时无法加载。',
       detail: `已尝试重新加载。排查日志保存在 ${log}`,
       buttons: ['重试', '退出'], defaultId: 0, cancelId: 1, noLink: true,
     });
@@ -346,7 +346,7 @@ if (!app.requestSingleInstanceLock()) {
     await brandingReady;
     if (!await setupWindow(await windowsBrand.icon())) return;
     tray = new Tray(icon);
-    tray.setToolTip('Jinkra 工具箱');
+    tray.setToolTip('小金工具箱');
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '打开工具箱', click: showWindow },
       { label: '退出', click: () => app.quit() },
@@ -358,7 +358,7 @@ if (!app.requestSingleInstanceLock()) {
     powerMonitor.on('resume', schedule.wake);
   }).catch((error) => {
     signalSplash();
-    dialog.showErrorBox('无法启动 Jinkra 工具箱', error.message);
+    dialog.showErrorBox('无法启动小金工具箱', error.message);
     app.quit();
   });
 }

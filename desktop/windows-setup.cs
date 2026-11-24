@@ -10,8 +10,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("Jinkra Toolbox Setup")]
-[assembly: AssemblyProduct("Jinkra-Toolbox")]
+[assembly: AssemblyTitle("小金工具箱安装程序")]
+[assembly: AssemblyProduct("小金工具箱")]
 [assembly: AssemblyCompany("Jinkra")]
 
 internal sealed class ToolboxSetup : Form {
@@ -52,7 +52,7 @@ internal sealed class ToolboxSetup : Form {
     private ToolboxSetup(Image avatar, string uninstallDirectory = null) {
         this.avatar = avatar;
         removing = uninstallDirectory != null;
-        Text = removing ? "Jinkra-Toolbox 卸载向导" : "Jinkra-Toolbox 安装向导";
+        Text = removing ? "小金工具箱 卸载向导" : "小金工具箱 安装向导";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
@@ -69,7 +69,7 @@ internal sealed class ToolboxSetup : Form {
         };
         FormClosing += delegate(object sender, FormClosingEventArgs args) { if (running) args.Cancel = true; };
 
-        headline = PlaceLabel(removing ? "卸载 Jinkra 工具箱" : "安装 Jinkra 工具箱", 300, 77, 410, 44, 23, Ink, FontStyle.Bold);
+        headline = PlaceLabel(removing ? "卸载小金工具箱" : "安装小金工具箱", 300, 77, 410, 44, 23, Ink, FontStyle.Bold);
         detail = PlaceLabel(removing ? "将从这台电脑移除工具箱及其快捷方式。" : "选择工具箱的安装位置。",
             301, 127, 402, 28, 10, Muted, FontStyle.Regular);
         PlaceLabel("安装目录", 301, 177, 380, 23, 10, Ink, FontStyle.Bold);
@@ -172,10 +172,10 @@ internal sealed class ToolboxSetup : Form {
         g.DrawImage(avatar, new RectangleF((BrandWidth - 159) / 2f, 127, 159, 159));
         using (var dark = new SolidBrush(Ink))
         using (var subtle = new SolidBrush(Muted))
-        using (var display = new Font("Segoe UI Semibold", 23, FontStyle.Bold))
+        using (var display = new Font("Microsoft YaHei UI", 21, FontStyle.Bold))
         using (var small = new Font("Consolas", 11))
         using (var centered = new StringFormat { Alignment = StringAlignment.Center }) {
-            g.DrawString("Jinkra Toolbox", display, dark, new RectangleF(0, 312, BrandWidth, 48), centered);
+            g.DrawString("小金工具箱", display, dark, new RectangleF(0, 312, BrandWidth, 48), centered);
             g.DrawString("Windows x64", small, subtle, new RectangleF(0, 368, BrandWidth, 24), centered);
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
             g.DrawString("版本 " + version, small, subtle, new RectangleF(0, 402, BrandWidth, 24), centered);
@@ -223,7 +223,7 @@ internal sealed class ToolboxSetup : Form {
             await Task.Run(() => Install(target, updates, desktop, quick, false));
             complete = true;
             headline.Text = "安装完成";
-            detail.Text = "可以从开始菜单打开 Jinkra 工具箱。";
+            detail.Text = "可以从开始菜单打开小金工具箱。";
             SetStatus(taskbarGuide.Checked ? "启动后，右键任务栏上的工具箱图标，选择「固定到任务栏」。" : "工具箱已安装到所选目录。", false);
             progress.Style = ProgressBarStyle.Continuous;
             progress.Value = 100;
@@ -270,7 +270,7 @@ internal sealed class ToolboxSetup : Form {
             await Task.Run(() => Uninstall(target, keep));
             complete = true;
             headline.Text = "卸载完成";
-            detail.Text = "已移除 Jinkra 工具箱。";
+            detail.Text = "已移除小金工具箱。";
             string data = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             bool remaining = !keep && (Directory.Exists(Path.Combine(data, Path.GetFileNameWithoutExtension(ProductExe))) ||
                 Directory.Exists(Path.Combine(data, "jinkra-toolbox")));

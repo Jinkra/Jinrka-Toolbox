@@ -81,9 +81,9 @@ function creatorLink(text) {
 }
 
 function brand() {
-  return el('button', { type: 'button', class: 'brand', onclick: () => { if (state.ready) navigate('home'); }, 'aria-label': 'Jinkra 工具箱首页' },
+  return el('button', { type: 'button', class: 'brand', onclick: () => { if (state.ready) navigate('home'); }, 'aria-label': '小金工具箱首页' },
     el('img', { class: 'brand-icon', src: logo, alt: '', width: 27, height: 27 }),
-    el('span', { class: 'brand-wordmark' }, el('strong', {}, 'Jinkra'), el('span', { class: 'brand-label' }, '工具箱')));
+    el('span', { class: 'brand-wordmark' }, el('strong', {}, '小金'), el('span', { class: 'brand-label' }, '工具箱')));
 }
 
 function navigationButton(id, label, symbol, count) {
@@ -202,13 +202,13 @@ function home() {
     el('header', { class: 'home-hero' },
       el('div', { class: 'home-hero-copy' },
         el('div', { class: 'hero-meta' }, icon('Grid2X2', 14), 'Windows 安装版'),
-        el('h1', { tabindex: '-1' }, 'Jinkra 工具箱'),
+        el('h1', { tabindex: '-1' }, '小金工具箱'),
         el('div', { class: 'hero-facts' }, el('span', {}, `版本 ${version}`), el('span', {}, `${tools.length} 个工具`)),
         el('div', { class: 'hero-actions' },
           button('查找工具', () => { search.focus(); search.select(); }, 'secondary', 'Search'),
           button('日程表', () => openTool(byId.get(agenda.id)), 'schedule-action', 'CalendarClock'))),
       el('div', { class: 'hero-portrait' }, el('div', { class: 'hero-orbit' },
-        el('img', { src: logo, alt: 'Jinkra 头像' })),
+        el('img', { src: logo, alt: '小金工具箱图标' })),
         el('span', { class: 'hero-mark code' }, icon('CodeXml', 19)),
         el('span', { class: 'hero-mark media' }, icon('Image', 19)),
         el('span', { class: 'hero-mark files' }, icon('FileText', 17)))),
@@ -570,7 +570,7 @@ function lock() {
   const activation = el('div', { class: 'gateway' },
     el('section', { class: 'gateway-card activation-card' },
       el('div', { class: 'gateway-brand' }, el('img', { class: 'launch-logo', src: logo, alt: '' }),
-        el('strong', { class: 'gateway-wordmark' }, el('span', {}, 'Jinkra'), el('span', {}, 'Toolbox')),
+        el('strong', { class: 'gateway-wordmark' }, el('span', {}, '小金'), el('span', {}, '工具箱')),
         el('p', { class: 'gateway-version' }, `版本号：${version}`)),
       el('div', { class: 'gateway-content' }, el('h1', {}, '激活工具箱'),
         el('p', {}, '输入激活码后即可使用当前版本。'), form,

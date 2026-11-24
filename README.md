@@ -1,10 +1,10 @@
-# Jinkra 工具箱
+# 小金工具箱
 
 面向 Windows 10/11 x64 的个人工具箱。单个可执行文件自带 Electron 和 FFmpeg，工具处理在本机完成，无需登录或另外安装运行库。检查和下载更新时访问 GitHub。
 
 ## 运行
 
-从 [GitHub Releases](https://github.com/Jinkra/Jinrka-Toolbox/releases/latest) 获取 Windows x64 安装包，选择目录并完成安装，然后从开始菜单打开工具箱。从旧便携版迁移时，请先运行一次安装包。首次打开每个版本需要输入激活码，激活记录保存在本机。程序未做数字签名。
+从 [GitHub Releases](https://github.com/Jinkra/XJ-Toolbox/releases/latest) 获取 Windows x64 安装包，选择目录并完成安装，然后从开始菜单打开工具箱。从旧便携版迁移时，请先运行一次安装包。首次打开每个版本需要输入激活码，激活记录保存在本机。程序未做数字签名。
 
 微信搜索「都拓文化」或扫描激活页二维码，关注公众号获取激活码。程序默认在启动后检查最新发行版。右上角设置提供手动检查更新、默认工具模式、布局密度、动画及窗口关闭行为。检查和下载支持 GitHub 直连及加速线路。更新弹窗显示发布备注，下载前测速，失败时自动切换。校验发布清单签名和完整文件的 SHA-256 后，在原安装目录更新并重新启动。见[激活与发布保护](docs/activation-security.md)。
 

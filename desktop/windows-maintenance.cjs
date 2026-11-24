@@ -17,9 +17,15 @@ async function run(script) {
     { windowsHide: true, timeout: 120_000 });
 }
 
+const overlayFolders = () => [process.env.ProgramData, process.env.LOCALAPPDATA].filter((folder) => folder && path.isAbsolute(folder));
+
 function arrowIcon() {
-  const folders = [process.env.ProgramData, process.env.LOCALAPPDATA].filter((folder) => folder && path.isAbsolute(folder));
-  return folders.map((folder) => path.join(folder, 'Jinkra-Toolbox', 'shortcut-overlay.ico'));
+  return overlayFolders().map((folder) => path.join(folder, 'Jinkra-Toolbox', 'shortcut-overlay-32.ico'));
+}
+
+// Earlier releases used a 1-bit icon, which Explorer renders as a black corner.
+function legacyArrowIcon() {
+  return overlayFolders().map((folder) => path.join(folder, 'Jinkra-Toolbox', 'shortcut-overlay.ico'));
 }
 
 function transparentIcon() {
@@ -29,25 +35,21 @@ function transparentIcon() {
   directory.writeUInt16LE(sizes.length, 4);
   let offset = directory.length;
   const bitmaps = sizes.map((size, index) => {
-    const stride = Math.ceil(size / 32) * 4;
-    const plane = stride * size;
-    const bitmap = Buffer.alloc(48 + 2 * plane);
+    const mask = Math.ceil(size / 32) * 4 * size;
+    const bitmap = Buffer.alloc(40 + size * size * 4 + mask);
     bitmap.writeUInt32LE(40, 0);
-    bitmap.writeUInt32LE(size, 4);
-    bitmap.writeUInt32LE(2 * size, 8);
+    bitmap.writeInt32LE(size, 4);
+    bitmap.writeInt32LE(2 * size, 8);
     bitmap.writeUInt16LE(1, 12);
-    bitmap.writeUInt16LE(1, 14);
-    bitmap.writeUInt32LE(2 * plane, 20);
-    bitmap.writeUInt32LE(2, 32);
-    bitmap.fill(0xff, 44, 47);
-    // Monochrome XOR is black. An all-ones AND mask preserves the underlying icon.
-    bitmap.fill(0xff, 48 + plane);
+    bitmap.writeUInt16LE(32, 14);
+    bitmap.writeUInt32LE(size * size * 4 + mask, 20);
+    // 32-bit BGRA with zero alpha everywhere, plus an all-transparent AND mask.
+    bitmap.fill(0xff, 40 + size * size * 4);
     const entry = 6 + index * 16;
     directory[entry] = size === 256 ? 0 : size;
     directory[entry + 1] = directory[entry];
-    directory[entry + 2] = 2;
     directory.writeUInt16LE(1, entry + 4);
-    directory.writeUInt16LE(1, entry + 6);
+    directory.writeUInt16LE(32, entry + 6);
     directory.writeUInt32LE(bitmap.length, entry + 8);
     directory.writeUInt32LE(offset, entry + 12);
     offset += bitmap.length;
@@ -73,7 +75,7 @@ async function writeOverlay() {
 }
 
 async function arrowStatus() {
-  const own = arrowIcon().map(literal).join(', ');
+  const own = [...arrowIcon(), ...legacyArrowIcon()].map(literal).join(', ');
   const { stdout } = await run(`
     $hives = @([Microsoft.Win32.Registry]::LocalMachine, [Microsoft.Win32.Registry]::CurrentUser)
     $values = @()
@@ -105,6 +107,7 @@ async function changeArrow(show) {
       : `$key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(${literal(shellIcons)}, $true); if ($key) { try { $key.DeleteValue('29', $false) } finally { $key.Dispose() } }`;
     await run(`$p = Start-Process -FilePath ${literal(powershell)} -ArgumentList @('-NoProfile','-NonInteractive','-EncodedCommand','${encoded(edit)}') -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode`);
     if (show) await run(`$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(${literal(shellIcons)}, $true); if ($key) { try { $key.DeleteValue('29', $false) } finally { $key.Dispose() } }`);
+    await run(`Start-Process -FilePath ${literal(path.join(system, 'ie4uinit.exe'))} -ArgumentList '-show' -WindowStyle Hidden -Wait`).catch(() => {});
     return await arrowStatus();
   } catch (error) {
     if (error.code === 'ENOENT') throw new Error('无法调用 Windows PowerShell。');

@@ -11,6 +11,7 @@ const notificationId = 'Jinkra.Toolbox.Windows';
 const shellAppId = 'Jinkra.Toolbox.Desktop';
 const ownedIds = [shellAppId, notificationId, 'Jinkra.Toolbox.Portable', previousId];
 const brandName = 'Jinkra-Toolbox';
+const displayName = '小金工具箱';
 const toastClsid = '{FDD365C6-1AC9-4DA9-8512-5E06D6789004}';
 const execute = promisify(execFile);
 const literal = (value) => "'" + value.replace(/'/g, "''") + "'";
@@ -83,7 +84,7 @@ async function registerBrand(icon, taskbarIcon) {
     [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
     $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey(${literal(path.win32.join('Software', 'Classes', 'AppUserModelId', notificationId))})
     try {
-      $key.SetValue('DisplayName', ${literal(brandName)}, 'String')
+      $key.SetValue('DisplayName', ${literal(displayName)}, 'String')
       $key.SetValue('IconUri', ${literal(iconPath)}, 'String')
       $key.SetValue('CustomActivator', ${literal(toastClsid)}, 'String')
     } finally { $key.Dispose() }
@@ -103,7 +104,7 @@ async function registerBrand(icon, taskbarIcon) {
   // Also register a Start Menu entry for Windows versions that resolve desktop toast sources from shortcuts.
   shell.writeShortcutLink(shortcut, {
     target, cwd: path.dirname(target), icon: taskbarIcon, iconIndex: 0, appUserModelId: shellAppId, toastActivatorClsid: toastClsid,
-    description: '打开 Jinkra 工具箱',
+    description: '打开小金工具箱',
   });
   return true;
 }

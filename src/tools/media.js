@@ -307,7 +307,7 @@ function imageTool() {
 }
 
 function qrTool() {
-  const content = area('输入文本或链接…', 'Jinkra 工具箱');
+  const content = area('输入文本或链接…', '小金工具箱');
   const file = fileInput('image');
   const status = makeStatus();
   const result = resultText();

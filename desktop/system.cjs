@@ -1,7 +1,7 @@
 const { app, dialog, shell } = require('electron');
 const { execFile } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
-const { lstat, readdir, realpath, statfs, unlink } = require('node:fs/promises');
+const { lstat, readFile, readdir, realpath, statfs, unlink } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { promisify } = require('node:util');
@@ -30,14 +30,35 @@ async function systemInfo() {
   };
 }
 
-async function trimMemory() {
+const memoryHelper = () => app.isPackaged ? path.join(process.resourcesPath, 'jinkra-memory.exe')
+  : path.resolve(__dirname, '../vendor/updater/jinkra-memory.exe');
+const literal = (value) => "'" + value.replace(/'/g, "''") + "'";
+
+// The deep pass needs administrator rights to reach every process and the system memory lists.
+async function deepTrim() {
+  const result = path.join(app.getPath('temp'), `jinkra-memory-${randomUUID()}.json`);
+  const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  const script = `$p = Start-Process -FilePath ${literal(memoryHelper())} -ArgumentList @('--deep', ${literal('"' + result + '"')}) -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode`;
+  try {
+    await run(powershell, ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from("$ErrorActionPreference='Stop'; " + script, 'utf16le').toString('base64')],
+      { windowsHide: true, timeout: 120_000 }).catch((error) => {
+      if (error.code !== 2) throw new Error('深度释放需要管理员确认，操作已取消。');
+    });
+    const data = JSON.parse(await readFile(result, 'utf8'));
+    return { count: data.count, steps: data.steps };
+  } finally {
+    await unlink(result).catch(() => {});
+  }
+}
+
+async function trimMemory(deep = false) {
+  if (typeof deep !== 'boolean') throw new Error('内存释放模式无效。');
   if (trimming) throw new Error('正在释放内存。');
   trimming = true;
   try {
-    const executable = app.isPackaged ? path.join(process.resourcesPath, 'jinkra-memory.exe')
-      : path.resolve(__dirname, '../vendor/updater/jinkra-memory.exe');
     const before = memory();
-    const { stdout } = await run(executable, [], { windowsHide: true, timeout: 20_000 });
+    if (deep) return { before, ...(await deepTrim()), after: memory(), deep: true };
+    const { stdout } = await run(memoryHelper(), [], { windowsHide: true, timeout: 20_000 });
     const count = Number(stdout.trim());
     if (!Number.isInteger(count) || count < 0) throw new Error('无法读取内存释放结果。');
     return { before, after: memory(), count };

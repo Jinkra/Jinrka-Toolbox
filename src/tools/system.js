@@ -22,15 +22,19 @@ function memoryTool() {
     draw((await desktop.systemInfo()).memory);
     status.set('');
   }, '正在读取内存状态…');
-  const release = button('一键释放内存', task(status, async () => {
-    const { before, after, count } = await desktop.systemTrimMemory();
+  const report = ({ before, after, count, steps, deep }) => {
     draw(after, before);
     const change = after.free - before.free;
-    status.set(`已处理 ${count} 个进程，可用内存${change >= 0 ? '增加' : '减少'} ${size(Math.abs(change))}。`, 'success');
-  }, '正在释放进程工作集…'), 'primary', 'MemoryStick');
+    const detail = deep ? `整理 ${count} 个进程${steps ? `，完成 ${steps} 项系统内存整理` : '，未获得系统内存整理权限'}` : `已处理 ${count} 个进程`;
+    status.set(`${detail}，可用内存${change >= 0 ? '增加' : '减少'} ${size(Math.abs(change))}。`, 'success');
+  };
+  const deep = button('深度释放', task(status, async () => report(await desktop.systemTrimMemory(true)),
+    '正在深度释放内存，请在弹出的窗口中确认管理员权限…'), 'primary', 'Zap');
+  const quick = button('快速释放', task(status, async () => report(await desktop.systemTrimMemory(false)),
+    '正在释放进程工作集…'), 'secondary', 'MemoryStick');
   void refresh();
-  return box(el('p', { class: 'hint' }, '对当前 Windows 会话中可访问的进程做工作集整理。应用再次访问这部分内存时，Windows 会重新载入。'),
-    actions(release, button('刷新状态', refresh, 'secondary', 'RefreshCw')), status.node, progress, results);
+  return box(el('p', { class: 'hint' }, '深度释放需要管理员确认：整理全部进程的工作集，把已修改页写回磁盘，并清空备用列表与系统文件缓存，效果与 PCL2 等工具相同。快速释放只整理当前会话的进程，无需管理员。释放后程序再次用到这些内存时会重新载入，短时间内可能略卡。'),
+    actions(deep, quick, button('刷新状态', refresh, 'quiet', 'RefreshCw')), status.node, progress, results);
 }
 
 function diskCleanup() {
@@ -96,7 +100,7 @@ function systemOverview() {
 }
 
 export const systemTools = [
-  { id: 'system-memory', name: '内存释放', icon: 'MemoryStick', description: '查看物理内存并整理当前会话进程的工作集。', keywords: 'RAM 内存清理 PCL2', render: memoryTool },
+  { id: 'system-memory', name: '内存释放', icon: 'MemoryStick', description: '查看物理内存，一键深度释放可用内存。', keywords: 'RAM 内存清理 PCL2', render: memoryTool },
   { id: 'system-cleanup', name: '系统盘清理', icon: 'HardDrive', description: '扫描并清理旧临时文件和 DirectX 缓存。', keywords: 'C盘 垃圾清理 存储', render: diskCleanup },
   { id: 'system-overview', name: '系统信息', icon: 'Monitor', description: '查看 Windows、CPU、内存和系统盘容量。', keywords: 'Windows CPU 磁盘 硬件', render: systemOverview },
   ...maintenanceTools,

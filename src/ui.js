@@ -4,7 +4,7 @@ import {
   Files, FileText, Fingerprint, Grid2X2, Hash, Image, KeyRound, Link2, LockKeyhole,
   NotebookPen, Palette, Pin, QrCode, Regex, Search, Settings2, ShieldCheck, Shuffle, Star,
   Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3, Sparkles, Download, RefreshCw, ExternalLink,
-  Monitor, HardDrive, MemoryStick,
+  Monitor, HardDrive, MemoryStick, Zap,
 } from 'lucide';
 
 const icons = {
@@ -13,7 +13,7 @@ const icons = {
   Files, FileText, Fingerprint, Grid2X2, Hash, Image, KeyRound, Link2, LockKeyhole,
   NotebookPen, Palette, Pin, QrCode, Regex, Search, Settings2, ShieldCheck, Shuffle, Star,
   Table2, Terminal, Timer, Type, Video, X, Clock3, ScanLine, CalendarClock, Layers3, Sparkles, Download, RefreshCw, ExternalLink,
-  Monitor, HardDrive, MemoryStick,
+  Monitor, HardDrive, MemoryStick, Zap,
 };
 
 export function el(tag, attributes = {}, ...children) {

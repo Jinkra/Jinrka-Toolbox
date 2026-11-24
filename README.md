@@ -1,4 +1,15 @@
+<div align="center">
+
+<img src="assets/icon.png" width="128" height="128" alt="小金工具箱">
+
 # 小金工具箱
+
+住在 Windows 上的离线百宝箱 · 开发 / 文本 / 媒体 / 文件 / AI / 系统工具一站集成
+
+[![下载最新版](https://img.shields.io/github/v/release/Jinkra/XJ-Toolbox?label=%E4%B8%8B%E8%BD%BD&color=1f6feb)](https://github.com/Jinkra/XJ-Toolbox/releases/latest)
+![平台](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078d4)
+
+</div>
 
 面向 Windows 10/11 x64 的个人工具箱。单个可执行文件自带 Electron 和 FFmpeg，工具处理在本机完成，无需登录或另外安装运行库。检查和下载更新时访问 GitHub。
 

@@ -14,6 +14,7 @@ const { systemInfo, trimMemory, scanCleanup, cleanScan, openStorageSettings } = 
 const { runtimeStatus, inspectDll, installRuntime, runtimeDocs } = require('./runtime.cjs');
 const { arrowStatus, changeArrow, openSystemCheck } = require('./windows-maintenance.cjs');
 const { checkApi } = require('./ai-connection.cjs');
+const network = require('./network.cjs');
 const { startupArg, loginStatus, setLogin, migrateLogin } = require('./startup.cjs');
 const { createSchedule } = require('./schedule.cjs');
 const { createReminderNotifications } = require('./reminder-notifications.cjs');
@@ -213,6 +214,19 @@ function setupIpc(activationReady) {
   ipc('system:arrow-status', arrowStatus);
   ipc('system:change-arrow', changeArrow);
   ipc('system:sfc', openSystemCheck);
+  ipc('ocr:languages', network.ocrLanguages);
+  ipc('ocr:image', network.ocrBytes);
+  ipc('ocr:clipboard', network.ocrClipboard);
+  ipc('hosts:read', network.hostsRead);
+  ipc('hosts:save', network.hostsSave);
+  ipc('hosts:restore', () => network.hostsRestore(window));
+  ipc('dns:flush', network.dnsFlush);
+  ipc('ports:list', (all) => network.portsList(all === true));
+  ipc('process:kill', (pid) => network.processKill(window, pid));
+  const networkProgress = (data) => { if (!window.isDestroyed()) window.webContents.send('toolbox:network:progress', data); };
+  ipc('network:ping', (options) => network.ping(options, networkProgress));
+  ipc('network:speed', () => network.speedTest(networkProgress));
+  ipc('network:cancel', network.networkCancel);
   ipc('schedule:list', schedule.list);
   ipc('schedule:save', schedule.save);
   ipc('schedule:remove', schedule.remove);

@@ -27,6 +27,23 @@ contextBridge.exposeInMainWorld('desktop', {
   systemArrowStatus: invoke('system:arrow-status'),
   systemChangeArrow: invoke('system:change-arrow'),
   systemSfc: invoke('system:sfc'),
+  ocrLanguages: invoke('ocr:languages'),
+  ocrImage: invoke('ocr:image'),
+  ocrClipboard: invoke('ocr:clipboard'),
+  hostsRead: invoke('hosts:read'),
+  hostsSave: invoke('hosts:save'),
+  hostsRestore: invoke('hosts:restore'),
+  dnsFlush: invoke('dns:flush'),
+  portsList: invoke('ports:list'),
+  processKill: invoke('process:kill'),
+  networkPing: invoke('network:ping'),
+  networkSpeed: invoke('network:speed'),
+  networkCancel: invoke('network:cancel'),
+  onNetworkProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('toolbox:network:progress', handler);
+    return () => ipcRenderer.removeListener('toolbox:network:progress', handler);
+  },
   scheduleList: invoke('schedule:list'),
   scheduleSave: invoke('schedule:save'),
   scheduleRemove: invoke('schedule:remove'),

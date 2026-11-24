@@ -2,7 +2,7 @@ import '@fontsource-variable/dm-sans/wght.css';
 import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import logo from '../assets/icon.png';
-import wechatPromotion from '../assets/wechat-promotion.png';
+import wechatQr from '../assets/wechat-qr.png';
 import { version } from '../package.json';
 import './styles.css';
 import { button, check, el, field, icon, iconButton, input, makeStatus, readableSize, select, task } from './ui.js';
@@ -15,14 +15,16 @@ import { agenda } from './tools/schedule.js';
 import { extraTools } from './tools/catalog.js';
 import { aiTools } from './tools/ai.js';
 import { systemTools } from './tools/system.js';
+import { networkTools, ocrTools } from './tools/network.js';
 
 const groups = [
   { id: 'developer', title: '开发工具', icon: 'CodeXml', tools: developerTools },
   { id: 'text', title: '文本工具', icon: 'AlignLeft', tools: textTools },
-  { id: 'media', title: '媒体工具', icon: 'Image', tools: mediaTools },
+  { id: 'media', title: '媒体工具', icon: 'Image', tools: [...mediaTools, ...ocrTools] },
   { id: 'files', title: '文件工具', icon: 'Files', tools: fileTools },
   { id: 'efficiency', title: '效率工具', icon: 'Timer', tools: [agenda, ...efficiencyTools] },
   { id: 'ai', title: 'AI 工具', icon: 'Sparkles', tools: aiTools },
+  { id: 'network', title: '网络工具', icon: 'Globe', tools: networkTools },
   { id: 'system', title: '系统工具', icon: 'Monitor', tools: systemTools },
 ].map((group) => ({ ...group, tools: [...group.tools, ...(extraTools[group.id] ?? [])] }));
 const tools = groups.flatMap((group) => group.tools.map((tool) => ({ ...tool, group })));
@@ -553,10 +555,10 @@ if (globalThis.desktop) {
 }
 
 function lock() {
-  const code = input({ type: 'password', maxlength: 128, required: true, placeholder: '输入激活码', 'aria-label': '激活码' });
+  const code = input({ type: 'password', maxlength: 128, required: true, placeholder: '请输入激活码', 'aria-label': '激活码', autocomplete: 'off', spellcheck: 'false' });
   const status = makeStatus();
   const submit = el('button', { type: 'submit', class: 'button primary' }, '激活并进入', icon('ArrowRight', 16));
-  const form = el('form', { class: 'activation-form' }, code, submit, status.node);
+  const form = el('form', { class: 'activation-form' }, el('div', { class: 'activation-input' }, icon('KeyRound', 17), code), submit, status.node);
   const activate = task(status, async () => {
     submit.disabled = true;
     try {
@@ -568,15 +570,21 @@ function lock() {
   }, '正在验证…');
   form.addEventListener('submit', (event) => { event.preventDefault(); void activate(event); });
   const activation = el('div', { class: 'gateway' },
-    el('section', { class: 'gateway-card activation-card' },
-      el('div', { class: 'gateway-brand' }, el('img', { class: 'launch-logo', src: logo, alt: '' }),
-        el('strong', { class: 'gateway-wordmark' }, el('span', {}, '小金'), el('span', {}, '工具箱')),
-        el('p', { class: 'gateway-version' }, `版本号：${version}`)),
-      el('div', { class: 'gateway-content' }, el('h1', {}, '激活工具箱'),
-        el('p', {}, '输入激活码后即可使用当前版本。'), form,
-        el('div', { class: 'activation-guide' },
-          el('p', {}, '微信搜索', el('strong', {}, '「都拓文化」'), '或扫描二维码关注公众号，获取激活码。'),
-          el('img', { src: wechatPromotion, alt: '都拓文化微信公众号二维码', width: 1710, height: 624 })))));
+    el('section', { class: 'activation-card' },
+      el('header', { class: 'activation-head' },
+        el('img', { class: 'launch-logo', src: logo, alt: '' }),
+        el('div', { class: 'activation-brand' },
+          el('strong', { class: 'gateway-wordmark' }, el('span', {}, '小金'), el('span', {}, '工具箱')),
+          el('span', {}, `${tools.length} 个常用工具，一处打开`)),
+        el('span', { class: 'gateway-version' }, `v${version}`)),
+      el('div', { class: 'activation-body' },
+        el('h1', {}, '激活工具箱'),
+        el('p', {}, '输入激活码，即可使用当前版本的全部工具。'), form),
+      el('footer', { class: 'activation-guide' },
+        el('img', { src: wechatQr, alt: '都拓文化微信公众号二维码', width: 320, height: 320 }),
+        el('div', {},
+          el('strong', {}, '获取激活码'),
+          el('p', {}, '微信扫码，或搜索公众号', el('b', {}, '「都拓文化」'), '，关注后即可获取。')))));
   reveal(activation);
   frame.append(activation);
   code.focus();

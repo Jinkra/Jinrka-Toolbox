@@ -1,5 +1,4 @@
 const { execFile } = require('node:child_process');
-const { mkdir, writeFile, readFile } = require('node:fs/promises');
 const path = require('node:path');
 const { promisify } = require('node:util');
 
@@ -17,65 +16,31 @@ async function run(script) {
     { windowsHide: true, timeout: 120_000 });
 }
 
-const overlayFolders = () => [process.env.ProgramData, process.env.LOCALAPPDATA].filter((folder) => folder && path.isAbsolute(folder));
+// Windows ships a blank icon at imageres.dll,197; using it avoids custom overlay files entirely.
+const blankOverlay = '%systemroot%\\system32\\imageres.dll,197';
 
-function arrowIcon() {
-  return overlayFolders().map((folder) => path.join(folder, 'Jinkra-Toolbox', 'shortcut-overlay-32.ico'));
-}
-
-// Earlier releases used a 1-bit icon, which Explorer renders as a black corner.
+// Overlay files written by earlier releases; still count as hidden by this toolbox.
 function legacyArrowIcon() {
-  return overlayFolders().map((folder) => path.join(folder, 'Jinkra-Toolbox', 'shortcut-overlay.ico'));
+  const folders = [process.env.ProgramData, process.env.LOCALAPPDATA].filter((folder) => folder && path.isAbsolute(folder));
+  return folders.flatMap((folder) => ['shortcut-overlay.ico', 'shortcut-overlay-32.ico']
+    .map((name) => path.join(folder, 'Jinkra-Toolbox', name)));
 }
 
-function transparentIcon() {
-  const sizes = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256];
-  const directory = Buffer.alloc(6 + sizes.length * 16);
-  directory.writeUInt16LE(1, 2);
-  directory.writeUInt16LE(sizes.length, 4);
-  let offset = directory.length;
-  const bitmaps = sizes.map((size, index) => {
-    const mask = Math.ceil(size / 32) * 4 * size;
-    const bitmap = Buffer.alloc(40 + size * size * 4 + mask);
-    bitmap.writeUInt32LE(40, 0);
-    bitmap.writeInt32LE(size, 4);
-    bitmap.writeInt32LE(2 * size, 8);
-    bitmap.writeUInt16LE(1, 12);
-    bitmap.writeUInt16LE(32, 14);
-    bitmap.writeUInt32LE(size * size * 4 + mask, 20);
-    // 32-bit BGRA with zero alpha everywhere, plus an all-transparent AND mask.
-    bitmap.fill(0xff, 40 + size * size * 4);
-    const entry = 6 + index * 16;
-    directory[entry] = size === 256 ? 0 : size;
-    directory[entry + 1] = directory[entry];
-    directory.writeUInt16LE(1, entry + 4);
-    directory.writeUInt16LE(32, entry + 6);
-    directory.writeUInt32LE(bitmap.length, entry + 8);
-    directory.writeUInt32LE(offset, entry + 12);
-    offset += bitmap.length;
-    return bitmap;
-  });
-  return Buffer.concat([directory, ...bitmaps]);
-}
-
-async function writeOverlay() {
-  const icon = transparentIcon();
-  for (const target of arrowIcon()) {
-    try {
-      await mkdir(path.dirname(target), { recursive: true });
-      await writeFile(target, icon, { flag: 'wx' }).catch(async (error) => {
-        if (error.code !== 'EEXIST' || !(await readFile(target)).equals(icon)) throw error;
-      });
-      return target;
-    } catch {
-      // Another Windows profile may own the shared folder.
-    }
-  }
-  throw new Error('无法保存快捷方式覆盖图标。');
+async function refreshIcons() {
+  await run(`
+    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 800
+    $cache = Join-Path $env:LOCALAPPDATA 'IconCache.db'
+    if (Test-Path -LiteralPath $cache) { Remove-Item -LiteralPath $cache -Force -ErrorAction SilentlyContinue }
+    Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Explorer') -Filter 'iconcache_*.db' -ErrorAction SilentlyContinue |
+      Remove-Item -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 1500
+    if (!(Get-Process -Name explorer -ErrorAction SilentlyContinue)) { Start-Process -FilePath (Join-Path $env:SystemRoot 'explorer.exe') }
+  `);
 }
 
 async function arrowStatus() {
-  const own = [...arrowIcon(), ...legacyArrowIcon()].map(literal).join(', ');
+  const own = [blankOverlay, ...legacyArrowIcon()].map(literal).join(', ');
   const { stdout } = await run(`
     $hives = @([Microsoft.Win32.Registry]::LocalMachine, [Microsoft.Win32.Registry]::CurrentUser)
     $values = @()
@@ -101,13 +66,13 @@ async function changeArrow(show) {
   if (changing) throw new Error('正在修改箭头设置，请稍候。');
   changing = true;
   try {
-    const entry = show ? null : await writeOverlay();
+    const entry = show ? null : blankOverlay;
     const edit = entry
       ? `$key = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey(${literal(shellIcons)}); try { $key.SetValue('29', ${literal(entry)}, 'String') } finally { $key.Dispose() }`
       : `$key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(${literal(shellIcons)}, $true); if ($key) { try { $key.DeleteValue('29', $false) } finally { $key.Dispose() } }`;
     await run(`$p = Start-Process -FilePath ${literal(powershell)} -ArgumentList @('-NoProfile','-NonInteractive','-EncodedCommand','${encoded(edit)}') -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode`);
     if (show) await run(`$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(${literal(shellIcons)}, $true); if ($key) { try { $key.DeleteValue('29', $false) } finally { $key.Dispose() } }`);
-    await run(`Start-Process -FilePath ${literal(path.join(system, 'ie4uinit.exe'))} -ArgumentList '-show' -WindowStyle Hidden -Wait`).catch(() => {});
+    await refreshIcons().catch(() => {});
     return await arrowStatus();
   } catch (error) {
     if (error.code === 'ENOENT') throw new Error('无法调用 Windows PowerShell。');

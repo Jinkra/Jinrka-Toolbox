@@ -15,7 +15,7 @@ function arrowTool() {
       : '设置已保存，重新登录 Windows 后检查桌面图标。', result === 'custom' ? 'error' : 'success');
   }, '正在等待 Windows 管理员授权…');
   void refresh();
-  return box(el('p', { class: 'hint' }, '通过 Windows 图标覆盖设置隐藏小箭头。操作需要管理员确认，适用于此电脑的快捷方式。'),
+  return box(el('p', { class: 'hint' }, '通过 Windows 图标覆盖设置隐藏小箭头。操作需要管理员确认，完成后会自动重启资源管理器并清理图标缓存，桌面会短暂闪烁。'),
     state, actions(button('隐藏小箭头', change(false), 'primary', 'Link2'),
       button('恢复默认箭头', change(true), 'secondary', 'RefreshCw'), button('刷新状态', refresh, 'quiet')), status.node);
 }
